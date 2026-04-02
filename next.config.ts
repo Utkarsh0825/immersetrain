@@ -16,6 +16,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // 360° MP4: WebGL / Quest may need CORS-clean video textures
+        source: '/videos/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Accept-Ranges', value: 'bytes' },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
         // Required for WebXR / A-Frame on Meta Quest
         source: '/train/(.*)',
         headers: [

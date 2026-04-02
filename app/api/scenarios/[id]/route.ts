@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getScenario, DEMO_SCENARIO } from '@/lib/scenarios';
 import { createServiceClient } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
 export async function GET(
   _req: NextRequest,
@@ -15,7 +16,7 @@ export async function GET(
   }
 
   try {
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('xxx')) {
+    if (!isSupabaseConfigured()) {
       return NextResponse.json(DEMO_SCENARIO);
     }
     const supabase = createServiceClient();

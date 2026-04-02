@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { ScenarioWithQuestions } from '@/types';
 import { DEMO_SCENARIO, SUBWAY_TOUR_SCENARIO } from '@/lib/scenarios';
+import { isSupabaseUrlPlaceholder } from '@/lib/supabaseConfigured';
 import { useQuizEngine } from '@/hooks/useQuizEngine';
 import QuizOverlay from '@/components/train/QuizOverlay';
 import ProgressBar from '@/components/train/ProgressBar';
@@ -63,9 +64,17 @@ export default function TrainPage() {
     load();
   }, [scenarioId]);
 
-  // Create session
+  // Create session (Supabase off: local-only id + APIs return 200 without DB)
   useEffect(() => {
-    if (!isLoaded || !user || !scenario) return;
+    if (!isLoaded || !scenario) return;
+
+    if (isSupabaseUrlPlaceholder()) {
+      setSessionId(`local-${Date.now()}`);
+      return;
+    }
+
+    if (!user) return;
+
     const create = async () => {
       try {
         const res = await fetch('/api/sessions', {

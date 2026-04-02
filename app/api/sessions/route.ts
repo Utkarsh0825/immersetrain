@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
 export async function POST(req: NextRequest) {
+  // No DB / placeholder envs: demo mode — no Clerk required (Quest / boss testing without Supabase)
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ sessionId: `local-${Date.now()}`, offline: true });
+  }
+
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
   const { scenarioId, userEmail, userName } = body;
-
-  // Demo mode fallback
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('xxx')) {
-    return NextResponse.json({ sessionId: `demo-session-${Date.now()}` });
-  }
 
   try {
     const supabase = createServiceClient();
@@ -33,20 +34,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sessionId: data.id });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ sessionId: `demo-session-${Date.now()}` });
+    return NextResponse.json({ sessionId: `local-${Date.now()}`, offline: true });
   }
 }
 
 export async function PATCH(req: NextRequest) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ success: true, offline: true });
+  }
+
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
   const { sessionId, score, completed } = body;
-
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('xxx')) {
-    return NextResponse.json({ success: true });
-  }
 
   try {
     const supabase = createServiceClient();
@@ -62,6 +63,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ success: false });
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }

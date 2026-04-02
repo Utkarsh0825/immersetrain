@@ -47,12 +47,18 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       aframeLoaded.current = true;
 
       const loadAFrame = () => {
+        const origin = window.location.origin;
+        const resolvedSrc = videoUrl.startsWith('/')
+          ? `${origin}${videoUrl}`
+          : videoUrl;
+        // crossorigin + /videos/* CORS headers (next.config) helps WebGL texture upload on desktop + Quest
+
         const sceneHTML = `
           <a-scene embedded style="height:100%;width:100%;position:absolute;top:0;left:0" vr-mode-ui="enabled:true">
-            <a-assets timeout="30000">
+            <a-assets timeout="60000">
               <video
                 id="trainingvideo"
-                src="${videoUrl}"
+                src="${resolvedSrc}"
                 crossorigin="anonymous"
                 loop="false"
                 preload="auto"
@@ -87,6 +93,14 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               const videoEl = document.getElementById('trainingvideo') as HTMLVideoElement;
               if (videoEl) {
                 videoRef.current = videoEl;
+                videoEl.addEventListener('error', () => {
+                  console.error(
+                    '[VideoPlayer360] Failed to load video',
+                    resolvedSrc,
+                    videoEl.error?.code,
+                    videoEl.error?.message
+                  );
+                });
                 videoEl.addEventListener('timeupdate', () => {
                   timeCallbacks.current.forEach((cb) => cb(videoEl.currentTime));
                 });
@@ -98,6 +112,14 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 const videoEl = document.getElementById('trainingvideo') as HTMLVideoElement;
                 if (videoEl) {
                   videoRef.current = videoEl;
+                  videoEl.addEventListener('error', () => {
+                    console.error(
+                      '[VideoPlayer360] Failed to load video',
+                      resolvedSrc,
+                      videoEl.error?.code,
+                      videoEl.error?.message
+                    );
+                  });
                   videoEl.addEventListener('timeupdate', () => {
                     timeCallbacks.current.forEach((cb) => cb(videoEl.currentTime));
                   });

@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
 export async function GET(req: NextRequest) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json([]);
+  }
+
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -16,10 +21,6 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const scenarioId = searchParams.get('scenarioId');
-
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('xxx')) {
-    return NextResponse.json([]);
-  }
 
   try {
     const supabase = createServiceClient();

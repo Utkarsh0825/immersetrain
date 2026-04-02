@@ -1,6 +1,7 @@
 import { Users, TrendingUp, CheckCircle2, Calendar } from 'lucide-react';
 import AdminTable from '@/components/dashboard/AdminTable';
 import { CLERK_READY } from '@/lib/clerkReady';
+import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
 export default async function AdminPage() {
   if (CLERK_READY) {
@@ -21,7 +22,7 @@ export default async function AdminPage() {
   }> = [];
 
   try {
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('xxx')) {
+    if (isSupabaseConfigured()) {
       const { createServiceClient } = await import('@/lib/supabase');
       const supabase = createServiceClient();
       const { data } = await supabase

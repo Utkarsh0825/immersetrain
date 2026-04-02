@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
 export async function POST(req: NextRequest) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ success: true, offline: true });
+  }
+
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
   const { sessionId, questionId, chosenOption, isCorrect, pointsEarned } = body;
-
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('xxx')) {
-    return NextResponse.json({ success: true });
-  }
 
   try {
     const supabase = createServiceClient();
@@ -26,6 +27,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ success: false });
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }

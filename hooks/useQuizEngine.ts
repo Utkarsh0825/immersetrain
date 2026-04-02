@@ -85,6 +85,22 @@ export function useQuizEngine({ questions, sessionId, onComplete }: UseQuizEngin
     const newAnswers = [...answers, newAnswer];
     const allAnswered = newAnsweredQuestions.size >= questions.length;
 
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(
+          'immersetrain_quiz_progress',
+          JSON.stringify({
+            sessionId,
+            answers: newAnswers,
+            score: newScore,
+            at: Date.now(),
+          })
+        );
+      }
+    } catch {
+      /* ignore quota / private mode */
+    }
+
     setEngineState((prev) => ({
       ...prev,
       state: 'showing_feedback',

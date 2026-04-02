@@ -3,6 +3,7 @@ import { Play, Clock, BookOpen, TrendingUp, Zap } from 'lucide-react';
 import { DEMO_SCENARIO, SUBWAY_TOUR_SCENARIO } from '@/lib/scenarios';
 import ScoreCardServer from './ScoreCardServer';
 import { CLERK_READY } from '@/lib/clerkReady';
+import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
 export default async function DashboardPage() {
   let userId: string | null = 'demo-user';
@@ -23,7 +24,7 @@ export default async function DashboardPage() {
   }> = [];
 
   try {
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('xxx')) {
+    if (isSupabaseConfigured()) {
       const { createServiceClient } = await import('@/lib/supabase');
       const supabase = createServiceClient();
       const { data } = await supabase
