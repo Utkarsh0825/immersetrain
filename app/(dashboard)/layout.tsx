@@ -24,7 +24,7 @@ async function ClerkUserButton() {
   const { UserButton } = await import('@clerk/nextjs');
   return (
     <div style={{ position: 'fixed', top: 14, right: 24, zIndex: 50 }}>
-      <UserButton afterSignOutUrl="/" />
+      <UserButton />
     </div>
   );
 }

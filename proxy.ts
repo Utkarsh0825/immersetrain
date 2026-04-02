@@ -1,34 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
 import { CLERK_READY } from '@/lib/clerkReady';
 
-export default async function proxy(request: NextRequest) {
-  // Skip all Clerk logic when keys are not configured (demo / preview mode)
+/**
+ * Public routes: no redirect to sign-in. API routes are public at the edge;
+ * each handler uses auth() / Supabase as needed (avoids breaking fetch JSON).
+ */
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api(.*)',
+  '/train(.*)',
+  '/results(.*)',
+]);
+
+export default clerkMiddleware(async (auth, req) => {
   if (!CLERK_READY) {
     return NextResponse.next();
   }
-
-  const { clerkMiddleware, createRouteMatcher } = await import('@clerk/nextjs/server');
-
-  const isPublicRoute = createRouteMatcher([
-    '/',
-    '/sign-in(.*)',
-    '/sign-up(.*)',
-    '/api/webhooks(.*)',
-  ]);
-
-  const handler = clerkMiddleware(async (auth, req) => {
-    if (!isPublicRoute(req)) {
-      const { userId } = await auth();
-      if (!userId) {
-        const signInUrl = new URL('/sign-in', req.url);
-        return NextResponse.redirect(signInUrl);
-      }
-    }
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return handler(request, {} as any);
-}
+  if (!isPublicRoute(req)) {
+    await auth.protect();
+  }
+});
 
 export const config = {
   matcher: [
