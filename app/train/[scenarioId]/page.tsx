@@ -87,7 +87,7 @@ export default function TrainPage() {
           }),
         });
         const data = await res.json();
-        setSessionId(data.sessionId);
+        setSessionId(data.sessionId ?? `local-${Date.now()}`);
       } catch {
         setSessionId(`local-${Date.now()}`);
       }
