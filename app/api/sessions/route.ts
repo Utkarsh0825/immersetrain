@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase';
 import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
@@ -8,38 +7,16 @@ function errorMessage(err: unknown): string {
   return String(err);
 }
 
+/** Stable anonymous demo user (matches client useCurrentUser hook). */
+const DEMO_USER_ID = 'demo-user-001';
+
 export async function POST(req: NextRequest) {
   try {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ sessionId: `local-${Date.now()}`, offline: true });
     }
 
-    let userId: string | null = null;
-    try {
-      const authResult = await auth();
-      userId = authResult.userId ?? null;
-    } catch (authErr) {
-      console.error('[sessions POST] Clerk auth error:', authErr);
-      const details = errorMessage(authErr);
-      return NextResponse.json(
-        {
-          error: 'Clerk auth failed',
-          details,
-          hint: 'Check CLERK_SECRET_KEY and that the request includes a valid Clerk session (cookies).',
-        },
-        { status: 401 }
-      );
-    }
-
-    if (!userId) {
-      return NextResponse.json(
-        {
-          error: 'Unauthorized',
-          details: 'No Clerk userId — sign in or use offline mode when Supabase is not configured.',
-        },
-        { status: 401 }
-      );
-    }
+    const userId = DEMO_USER_ID;
 
     let body: { scenarioId?: string; userEmail?: string; userName?: string };
     try {
@@ -74,7 +51,6 @@ export async function POST(req: NextRequest) {
     } catch (dbErr) {
       console.error('[sessions POST] Supabase insert failed:', dbErr);
       const details = errorMessage(dbErr);
-      // Still return a session id so the training UI works; client can read `details` for debugging.
       return NextResponse.json({
         sessionId: `local-${Date.now()}`,
         offline: true,
@@ -95,25 +71,6 @@ export async function PATCH(req: NextRequest) {
   try {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ success: true, offline: true });
-    }
-
-    let userId: string | null = null;
-    try {
-      const authResult = await auth();
-      userId = authResult.userId ?? null;
-    } catch (authErr) {
-      console.error('[sessions PATCH] Clerk auth error:', authErr);
-      return NextResponse.json(
-        { error: 'Clerk auth failed', details: errorMessage(authErr) },
-        { status: 401 }
-      );
-    }
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized', details: 'No Clerk userId' },
-        { status: 401 }
-      );
     }
 
     const body = await req.json();

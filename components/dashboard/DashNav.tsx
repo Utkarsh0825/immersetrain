@@ -3,11 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Layers, LayoutDashboard, Shield } from 'lucide-react';
 
-interface DashNavProps {
-  clerkReady: boolean;
-}
-
-export default function DashNav({ clerkReady }: DashNavProps) {
+export default function DashNav() {
   const pathname = usePathname();
 
   const links = [
@@ -23,7 +19,6 @@ export default function DashNav({ clerkReady }: DashNavProps) {
       padding: '0 24px',
     }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {/* Logo */}
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
           <div style={{
             width: 30, height: 30, borderRadius: 8, flexShrink: 0,
@@ -38,7 +33,6 @@ export default function DashNav({ clerkReady }: DashNavProps) {
           </span>
         </Link>
 
-        {/* Nav links */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {links.map(({ href, icon, label }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
@@ -58,25 +52,22 @@ export default function DashNav({ clerkReady }: DashNavProps) {
           })}
         </div>
 
-        {/* User badge */}
-        {!clerkReady && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '5px 14px', borderRadius: 100,
+          background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.18)',
+          fontSize: 12, fontWeight: 700, color: '#a78bfa',
+        }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '5px 14px', borderRadius: 100,
-            background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.18)',
-            fontSize: 12, fontWeight: 700, color: '#a78bfa',
+            width: 22, height: 22, borderRadius: '50%',
+            background: 'rgba(124,58,237,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, color: '#c4b5fd', fontWeight: 800,
           }}>
-            <div style={{
-              width: 22, height: 22, borderRadius: '50%',
-              background: 'rgba(124,58,237,0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 10, color: '#c4b5fd', fontWeight: 800,
-            }}>
-              D
-            </div>
-            Demo Mode
+            D
           </div>
-        )}
+          Demo Mode
+        </div>
       </div>
     </nav>
   );

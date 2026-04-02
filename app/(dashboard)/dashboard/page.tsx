@@ -2,22 +2,11 @@ import Link from 'next/link';
 import { Play, Clock, BookOpen, TrendingUp, Zap } from 'lucide-react';
 import { DEMO_SCENARIO, SUBWAY_TOUR_SCENARIO } from '@/lib/scenarios';
 import ScoreCardServer from './ScoreCardServer';
-import { CLERK_READY } from '@/lib/clerkReady';
 import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
 export default async function DashboardPage() {
-  let userId: string | null = 'demo-user';
-  let firstName = 'Trainee';
-
-  if (CLERK_READY) {
-    const { auth, currentUser } = await import('@clerk/nextjs/server');
-    const { redirect } = await import('next/navigation');
-    const authResult = await auth();
-    if (!authResult.userId) redirect('/sign-in');
-    userId = authResult.userId;
-    const user = await currentUser();
-    firstName = user?.firstName ?? 'Trainee';
-  }
+  const userId = 'demo-user-001';
+  const firstName = 'Demo';
 
   let sessions: Array<{
     id: string; score: number; max_score: number; completed: boolean; started_at: string; scenario_id: string;

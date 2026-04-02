@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { createServiceClient } from '@/lib/supabase';
 import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
@@ -7,9 +6,6 @@ export async function POST(req: NextRequest) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ success: true, offline: true });
   }
-
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
   const { sessionId, questionId, chosenOption, isCorrect, pointsEarned } = body;

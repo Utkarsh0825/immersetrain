@@ -1,20 +1,8 @@
 import { Users, TrendingUp, CheckCircle2, Calendar } from 'lucide-react';
 import AdminTable from '@/components/dashboard/AdminTable';
-import { CLERK_READY } from '@/lib/clerkReady';
 import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
 export default async function AdminPage() {
-  if (CLERK_READY) {
-    const { auth, clerkClient } = await import('@clerk/nextjs/server');
-    const { redirect } = await import('next/navigation');
-    const { userId } = await auth();
-    if (!userId) redirect('/sign-in');
-    const client = await clerkClient();
-    const user = await client.users.getUser(userId!);
-    const role = (user.publicMetadata as { role?: string })?.role;
-    if (role !== 'admin') redirect('/dashboard');
-  }
-
   // Fetch all sessions
   let sessions: Array<{
     id: string; user_id: string; user_name: string; user_email: string; score: number; max_score: number;
