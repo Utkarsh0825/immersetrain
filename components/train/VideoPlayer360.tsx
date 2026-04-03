@@ -7,7 +7,6 @@ export interface VideoPlayer360Handle {
   pause: () => void;
   getCurrentTime: () => number;
   onTimeUpdate: (cb: (time: number) => void) => () => void;
-  /** Enter stereo / device-orientation VR (Cardboard, mobile Safari). */
   enterVR: () => void;
 }
 
@@ -25,20 +24,44 @@ declare global {
 type ASceneEl = HTMLElement & {
   hasLoaded?: boolean;
   enterVR?: () => void;
-  enterFullscreen?: () => void;
 };
 
-const RETRY_DELAY_MS = 500;
+const RETRY_DELAY_MS = 400;
 const MAX_PLAY_RETRIES = 3;
-const TEXTURE_BIND_DELAY_MS = 1000;
+const CANPLAY_TIMEOUT_MS = 12000;
 
-function waitCanPlay(video: HTMLVideoElement): Promise<void> {
-  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return Promise.resolve();
+/** Resolve when enough data to paint first frame, or timeout (don’t block forever on slow networks). */
+function waitCanPlay(video: HTMLVideoElement, timeoutMs: number): Promise<void> {
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    return Promise.resolve();
+  }
+  return Promise.race([
+    new Promise<void>((resolve) => {
+      const done = () => resolve();
+      video.addEventListener('canplay', done, { once: true });
+      video.addEventListener('loadeddata', done, { once: true });
+      video.addEventListener('error', done, { once: true });
+    }),
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
+}
+
+/** Wait until GPU can sample at least one frame — then unmute so audio matches picture. */
+function waitFirstPaintAfterPlaying(video: HTMLVideoElement): Promise<void> {
   return new Promise((resolve) => {
-    const done = () => resolve();
-    video.addEventListener('canplay', done, { once: true });
-    video.addEventListener('loadeddata', done, { once: true });
-    video.addEventListener('error', done, { once: true });
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    };
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      video.requestVideoFrameCallback(() => finish());
+      window.setTimeout(finish, 700);
+      return;
+    }
+    video.addEventListener('playing', () => finish(), { once: true });
+    window.setTimeout(finish, 450);
   });
 }
 
@@ -50,39 +73,19 @@ function waitSceneLoaded(scene: ASceneEl | null): Promise<void> {
   });
 }
 
-async function playWithRetries(video: HTMLVideoElement): Promise<void> {
+async function playMutedWithRetries(video: HTMLVideoElement): Promise<void> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < MAX_PLAY_RETRIES; attempt++) {
     try {
       video.muted = true;
       await video.play();
-      await new Promise((r) => setTimeout(r, 120));
-      try {
-        video.muted = false;
-        await video.play();
-      } catch {
-        /* some browsers need one muted play first */
-      }
       return;
     } catch (e) {
       lastErr = e;
       await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-      try {
-        video.load();
-      } catch {
-        /* ignore */
-      }
     }
   }
   throw lastErr;
-}
-
-function showVideosphere() {
-  const sphere = document.querySelector('#immersive-sphere') as HTMLElement | null;
-  if (sphere) {
-    sphere.setAttribute('src', '#trainingvideo');
-    sphere.setAttribute('visible', 'true');
-  }
 }
 
 const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
@@ -135,26 +138,27 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         }
 
         videoRef.current = videoEl;
+        // Stay muted until first frame is ready — avoids “audio before video”
         videoEl.muted = true;
 
-        try {
-          videoEl.load();
-        } catch {
-          /* ignore */
-        }
-
-        await waitCanPlay(videoEl);
-        await new Promise((r) => setTimeout(r, TEXTURE_BIND_DELAY_MS));
+        await waitCanPlay(videoEl, CANPLAY_TIMEOUT_MS);
 
         try {
-          await playWithRetries(videoEl);
+          await playMutedWithRetries(videoEl);
         } catch (e) {
-          console.error('[VideoPlayer360] play retries exhausted', e);
-          videoEl.muted = true;
+          console.error('[VideoPlayer360] muted play failed', e);
           await videoEl.play().catch(() => {});
         }
 
-        showVideosphere();
+        await waitFirstPaintAfterPlaying(videoEl);
+
+        // Picture first, then sound (same tick as much as possible)
+        videoEl.muted = false;
+        try {
+          await videoEl.play();
+        } catch {
+          /* already playing */
+        }
       } finally {
         startInProgress.current = false;
         setVideoBuffering(false);
@@ -168,8 +172,10 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         v.muted = true;
         void v
           .play()
-          .then(() => {
+          .then(async () => {
+            await waitFirstPaintAfterPlaying(v);
             v.muted = false;
+            return v.play();
           })
           .catch(() => {});
       },
@@ -183,12 +189,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       },
       enterVR: () => {
         const scene = document.querySelector('a-scene') as ASceneEl | null;
-        if (scene?.enterVR) {
-          scene.enterVR();
-          return;
-        }
-        const anyScene = scene as unknown as { enterVR?: () => void };
-        anyScene?.enterVR?.();
+        scene?.enterVR?.();
       },
     }));
 
@@ -199,7 +200,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         setOverlayState('gone');
         setVideoBuffering(true);
         void startVideoSequence();
-      }, 500);
+      }, 400);
     }, [overlayState, startVideoSequence]);
 
     useEffect(() => {
@@ -238,7 +239,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               id="immersive-sphere"
               src="#trainingvideo"
               rotation="0 -90 0"
-              visible="false"
+              visible="true"
             ></a-videosphere>
             <a-camera>
               <a-cursor
@@ -274,36 +275,27 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
             }
           };
 
-          setTimeout(waitForScene, 400);
+          setTimeout(waitForScene, 200);
         }
       };
 
-      const run = () => {
-        if (window.AFRAME) {
-          loadAFrame();
-          return;
-        }
-        const poly = document.createElement('script');
-        poly.src = 'https://unpkg.com/webvr-polyfill@0.10.12/build/webvr-polyfill.js';
-        poly.async = true;
-        poly.onload = () => {
-          const script = document.createElement('script');
-          script.src = 'https://aframe.io/releases/1.6.0/aframe.min.js';
-          script.onload = loadAFrame;
-          script.onerror = () => console.error('Failed to load A-Frame');
-          document.head.appendChild(script);
+      if (window.AFRAME) {
+        loadAFrame();
+        return () => {
+          if (containerRef.current) containerRef.current.innerHTML = '';
         };
-        poly.onerror = () => {
-          const script = document.createElement('script');
-          script.src = 'https://aframe.io/releases/1.6.0/aframe.min.js';
-          script.onload = loadAFrame;
-          script.onerror = () => console.error('Failed to load A-Frame');
-          document.head.appendChild(script);
-        };
-        document.head.appendChild(poly);
-      };
+      }
 
-      run();
+      const script = document.createElement('script');
+      script.src = 'https://aframe.io/releases/1.6.0/aframe.min.js';
+      script.onload = loadAFrame;
+      script.onerror = () => console.error('Failed to load A-Frame');
+      document.head.appendChild(script);
+
+      const poly = document.createElement('script');
+      poly.src = 'https://unpkg.com/webvr-polyfill@0.10.12/build/webvr-polyfill.js';
+      poly.async = true;
+      document.head.appendChild(poly);
 
       return () => {
         if (containerRef.current) {
@@ -360,7 +352,10 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 fontWeight: 600,
               }}
             >
-              Loading 360° video…
+              Preparing 360° video…
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.45)', maxWidth: 280, textAlign: 'center' }}>
+              Sound starts when the picture is ready — avoids audio ahead of video.
             </p>
             <style>{`@keyframes vp360spin { to { transform: rotate(360deg); } }`}</style>
           </div>
@@ -390,7 +385,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               justifyContent: 'center',
               cursor: 'pointer',
               opacity: overlayState === 'fading' ? 0 : 1,
-              transition: 'opacity 0.5s ease',
+              transition: 'opacity 0.45s ease',
               pointerEvents: overlayState === 'fading' ? 'none' : 'auto',
             }}
           >
@@ -433,7 +428,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 lineHeight: 1.5,
               }}
             >
-              Look around by dragging. On phone, use Cardboard mode for stereo view. Answer questions as they appear.
+              Video and audio start together after the first frame is ready.
             </p>
           </div>
         )}
