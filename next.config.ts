@@ -16,16 +16,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // 360° MP4: WebGL / Quest may need CORS-clean video textures
+        // Avoid stale broken MP4 in browser cache; keep CORS for WebGL textures
         source: '/videos/:path*',
         headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
           { key: 'Access-Control-Allow-Origin', value: '*' },
           { key: 'Accept-Ranges', value: 'bytes' },
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
       {
-        // Required for WebXR / A-Frame on Meta Quest
         source: '/train/(.*)',
         headers: [
           { key: 'Cross-Origin-Embedder-Policy', value: 'unsafe-none' },

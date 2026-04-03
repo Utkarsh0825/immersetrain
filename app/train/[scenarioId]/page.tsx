@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { ScenarioWithQuestions } from '@/types';
 import { DEMO_SCENARIO, SUBWAY_TOUR_SCENARIO } from '@/lib/scenarios';
@@ -36,6 +36,7 @@ export default function TrainPage() {
   const [loading, setLoading] = useState(true);
   const [playerReady, setPlayerReady] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [isTouchLike, setIsTouchLike] = useState(false);
 
   const playerRef = useRef<VideoPlayer360Handle>(null);
   const isPausedRef = useRef(false);
@@ -150,6 +151,16 @@ export default function TrainPage() {
 
   const maxScore = (scenario?.questions.length ?? 10) * 10;
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 1024px)');
+    const check = () =>
+      setIsTouchLike(mq.matches || 'ontouchstart' in window || navigator.maxTouchPoints > 0);
+    check();
+    mq.addEventListener('change', check);
+    return () => mq.removeEventListener('change', check);
+  }, []);
+
   if (loading) {
     return (
       <div style={{ height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
@@ -204,9 +215,35 @@ export default function TrainPage() {
         videoUrl={scenario?.video_url ?? DEMO_SCENARIO.video_url}
         onReady={() => {
           setPlayerReady(true);
-          setTimeout(() => playerRef.current?.play(), 300);
         }}
       />
+
+      {/* Manual Cardboard / stereo entry when built-in VR button is hidden (esp. mobile Safari) */}
+      {playerReady && !completed && isTouchLike && (
+        <button
+          type="button"
+          onClick={() => playerRef.current?.enterVR()}
+          style={{
+            position: 'fixed',
+            bottom: 72,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9998,
+            padding: '12px 22px',
+            borderRadius: 999,
+            border: '2px solid rgba(255,255,255,0.35)',
+            background: 'rgba(0,0,0,0.82)',
+            color: 'white',
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+            pointerEvents: 'auto',
+          }}
+        >
+          🥽 Enter Cardboard mode
+        </button>
+      )}
 
       {/* ── Quiz overlay ── */}
       <AnimatePresence>
@@ -268,7 +305,7 @@ export default function TrainPage() {
           background: 'rgba(0,0,0,0.5)', borderRadius: 8, padding: '6px 12px',
           backdropFilter: 'blur(8px)', letterSpacing: '0.02em',
         }}>
-          Drag to look around · tap VR icon for Meta Quest
+          Drag to look · Quest: VR icon · Phone: Cardboard button below
         </div>
       )}
 
