@@ -1,3 +1,6 @@
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@700,600,500&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap');
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -6,54 +9,99 @@
 
 /* ── Design Tokens ─────────────────────────────────────────── */
 :root {
-  --bg: #04040f;
+  --bg: #060608;
   --surface: rgba(255,255,255,0.03);
   --surface-hover: rgba(255,255,255,0.06);
   --border: rgba(255,255,255,0.07);
   --border-bright: rgba(255,255,255,0.14);
 
-  /* Gradient palette */
+  --indigo: #5B4CFF;
+  --cyan: #00D4FF;
+  --indigo-dim: rgba(91, 76, 255, 0.15);
+  --cyan-dim: rgba(0, 212, 255, 0.12);
+
   --violet: #7c3aed;
   --blue: #2563eb;
-  --cyan: #06b6d4;
   --emerald: #10b981;
   --amber: #f59e0b;
 
-  --grad-primary: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
-  --grad-glow: linear-gradient(135deg, rgba(124,58,237,0.4) 0%, rgba(37,99,235,0.4) 100%);
+  --grad-primary: linear-gradient(135deg, #5B4CFF 0%, #00D4FF 100%);
+  --grad-glow: linear-gradient(135deg, rgba(91,76,255,0.4) 0%, rgba(0,212,255,0.4) 100%);
 
   --text-primary: #f1f5f9;
   --text-secondary: rgba(241,245,249,0.55);
   --text-muted: rgba(241,245,249,0.3);
 
-  --font-sans: var(--font-inter, system-ui, sans-serif);
-  --font-display: var(--font-syne, system-ui, sans-serif);
+  --font-clash: 'Clash Display', var(--font-syne, system-ui), sans-serif;
+  --font-satoshi: 'Satoshi', var(--font-inter, system-ui), sans-serif;
+  --font-sans: var(--font-satoshi);
+  --font-display: var(--font-clash);
   --radius: 0.75rem;
 
   /* shadcn compat */
-  --background: #04040f;
+  --background: #060608;
   --foreground: #f1f5f9;
   --card: rgba(255,255,255,0.03);
   --card-foreground: #f1f5f9;
-  --primary: #7c3aed;
+  --primary: #5B4CFF;
   --primary-foreground: #ffffff;
   --secondary: rgba(255,255,255,0.06);
   --secondary-foreground: #f1f5f9;
   --muted: rgba(255,255,255,0.04);
   --muted-foreground: rgba(241,245,249,0.55);
-  --accent: rgba(124,58,237,0.1);
-  --accent-foreground: #7c3aed;
+  --accent: rgba(91,76,255,0.1);
+  --accent-foreground: #5B4CFF;
   --border: rgba(255,255,255,0.07);
   --input: rgba(255,255,255,0.06);
-  --ring: #7c3aed;
+  --ring: #5B4CFF;
   --destructive: #ef4444;
+}
+
+/* ── Light Mode Overrides ─────────────────────────────────── */
+[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: rgba(0,0,0,0.03);
+  --surface-hover: rgba(0,0,0,0.06);
+  --border: rgba(0,0,0,0.08);
+  --border-bright: rgba(0,0,0,0.15);
+  --text-primary: #0f0f14;
+  --text-secondary: rgba(15,15,20,0.6);
+  --text-muted: rgba(15,15,20,0.35);
+  --background: #ffffff;
+  --foreground: #0f0f14;
+  --card: rgba(0,0,0,0.02);
+  --card-foreground: #0f0f14;
+  --secondary: rgba(0,0,0,0.05);
+  --secondary-foreground: #0f0f14;
+  --muted: rgba(0,0,0,0.04);
+  --muted-foreground: rgba(15,15,20,0.55);
+  --accent: rgba(91,76,255,0.08);
+  --accent-foreground: #5B4CFF;
+  --input: rgba(0,0,0,0.06);
+}
+
+[data-theme="light"] body {
+  background: #ffffff;
+  color: #0f0f14;
+}
+
+[data-theme="light"] ::selection {
+  background: rgba(91,76,255,0.2);
+  color: #0f0f14;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(91,76,255,0.3);
+}
+
+[data-theme="light"] .landing-page {
+  background: #ffffff !important;
 }
 
 /* ── Base ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
-  scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -61,46 +109,57 @@ html {
 body {
   background: var(--bg);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-satoshi);
   overflow-x: hidden;
 }
 
+/* ── Landing page cursor override ──────────────────────────── */
+.landing-page { cursor: none; }
+.landing-page a, .landing-page button { cursor: none; }
+@media (max-width: 768px) {
+  .landing-page { cursor: auto; }
+  .landing-page a, .landing-page button { cursor: pointer; }
+}
+
 /* ── Selection ─────────────────────────────────────────────── */
-::selection { background: rgba(124,58,237,0.35); color: white; }
+::selection { background: rgba(91,76,255,0.35); color: white; }
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.4); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(91,76,255,0.35); border-radius: 3px; }
 
-/* ── Animations ─────────────────────────────────────────────── */
+/* ── Animations ────────────────────────────────────────────── */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-12px); }
 }
-
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.5; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.05); }
 }
-
 @keyframes marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
-
 @keyframes gradient-shift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
 }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
 
 /* ── Utility classes ────────────────────────────────────────── */
+.font-clash { font-family: var(--font-clash); }
+.font-satoshi { font-family: var(--font-satoshi); }
 .font-display { font-family: var(--font-display); }
+
 .text-gradient {
   background: var(--grad-primary);
   -webkit-background-clip: text;
@@ -108,13 +167,13 @@ body {
   background-clip: text;
 }
 .text-gradient-cyan {
-  background: linear-gradient(135deg, #06b6d4, #7c3aed);
+  background: linear-gradient(135deg, #00D4FF, #5B4CFF);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
-.glow-violet { box-shadow: 0 0 60px rgba(124,58,237,0.25); }
-.glow-blue { box-shadow: 0 0 60px rgba(37,99,235,0.25); }
+.glow-indigo { box-shadow: 0 0 60px rgba(91,76,255,0.25); }
+.glow-cyan { box-shadow: 0 0 60px rgba(0,212,255,0.25); }
 
 .glass {
   background: rgba(255,255,255,0.04);
@@ -122,10 +181,13 @@ body {
   border: 1px solid rgba(255,255,255,0.08);
 }
 
-.marquee-track { animation: marquee 30s linear infinite; }
-.marquee-track:hover { animation-play-state: paused; }
+[data-theme="light"] .glass {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+}
 
-/* ── Page transition ────────────────────────────────────────── */
+.marquee-track { animation: marquee 35s linear infinite; }
+
 .page-enter { opacity: 0; transform: translateY(16px); }
 .page-enter-active { opacity: 1; transform: translateY(0); transition: all 0.5s cubic-bezier(0.22,1,0.36,1); }
 

@@ -105,7 +105,9 @@ export default async function AdminPage() {
             background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
             borderRadius: 20, padding: '60px 24px', textAlign: 'center',
           }}>
-            <div style={{ fontSize: 40, marginBottom: 16 }}>📊</div>
+            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(91,76,255,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="12" width="4" height="9" rx="1" /><rect x="10" y="8" width="4" height="13" rx="1" /><rect x="17" y="4" width="4" height="17" rx="1" /></svg>
+            </div>
             <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.4)', margin: '0 0 8px' }}>
               No training sessions yet.
             </p>

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Zap } from 'lucide-react';
 import { Question } from '@/types';
@@ -20,6 +20,17 @@ export default function QuizOverlay({
   totalQuestions,
 }: QuizOverlayProps) {
   const [selected, setSelected] = useState<'a' | 'b' | null>(null);
+
+  const swapped = useMemo(() => {
+    let hash = 0;
+    for (let i = 0; i < question.id.length; i++) {
+      hash = ((hash << 5) - hash) + question.id.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash % 2 === 0;
+  }, [question.id]);
+
+  const optionOrder = swapped ? (['b', 'a'] as const) : (['a', 'b'] as const);
 
   const handleSelect = (opt: 'a' | 'b') => {
     if (selected || feedback) return;
@@ -76,7 +87,9 @@ export default function QuizOverlay({
     return { ...base, opacity: 0.4 };
   };
 
-  const getOptionIcon = (opt: 'a' | 'b') => {
+  const getOptionIcon = (opt: 'a' | 'b', idx: number) => {
+    const displayLabel = idx === 0 ? 'A' : 'B';
+
     if (!feedback || selected !== opt) {
       if (opt === question.correct_option && feedback) {
         return <CheckCircle2 size={16} color="#22c55e" style={{ flexShrink: 0, marginTop: 1 }} />;
@@ -90,7 +103,7 @@ export default function QuizOverlay({
           fontSize: 11, fontWeight: 700, flexShrink: 0,
           color: 'rgba(255,255,255,0.5)',
         }}>
-          {opt.toUpperCase()}
+          {displayLabel}
         </span>
       );
     }
@@ -109,7 +122,7 @@ export default function QuizOverlay({
         fontSize: 11, fontWeight: 700, flexShrink: 0,
         color: 'rgba(255,255,255,0.25)',
       }}>
-        {opt.toUpperCase()}
+        {displayLabel}
       </span>
     );
   };
@@ -124,7 +137,7 @@ export default function QuizOverlay({
         display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
         padding: '0 16px 32px',
         zIndex: 20,
-        background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 40%, transparent 70%)',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 50%)',
       }}
     >
       <motion.div
@@ -134,8 +147,8 @@ export default function QuizOverlay({
         transition={{ type: 'spring', stiffness: 400, damping: 35 }}
         style={{
           width: '100%', maxWidth: 560,
-          background: 'rgba(8,8,12,0.92)',
-          backdropFilter: 'blur(24px)',
+          background: 'rgba(8,8,12,0.72)',
+          backdropFilter: 'blur(32px)',
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: 24,
           padding: '24px',
@@ -191,7 +204,7 @@ export default function QuizOverlay({
 
         {/* Options */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {(['a', 'b'] as const).map((opt) => (
+          {optionOrder.map((opt, idx) => (
             <button
               key={opt}
               onClick={() => handleSelect(opt)}
@@ -211,7 +224,7 @@ export default function QuizOverlay({
                 }
               }}
             >
-              {getOptionIcon(opt)}
+              {getOptionIcon(opt, idx)}
               <span style={{ lineHeight: 1.45 }}>
                 {opt === 'a' ? question.option_a : question.option_b}
               </span>

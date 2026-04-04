@@ -1,150 +1,225 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, Menu, X, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { useTheme } from '@/components/ThemeProvider';
+import { useThemeStyles } from '@/hooks/useThemeStyles';
 
 const NAV_LINKS = [
-  { label: 'Platform', href: '#platform' },
-  { label: 'Industries', href: '#industries' },
+  { label: 'How It Works', href: '#how-it-works' },
+  { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '#pricing' },
-  { label: 'Enterprise', href: '#enterprise' },
+  { label: 'Demo', href: '/demo' },
 ];
 
+const spring = { type: 'spring' as const, stiffness: 400, damping: 30 };
+
+function HamburgerIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" className="overflow-visible">
+      <motion.line
+        x1="4" y1="7" x2="20" y2="7"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+        animate={open ? { rotate: 45, y: 5, x1: 4, y1: 12, x2: 20, y2: 12 } : { rotate: 0, y: 0 }}
+        transition={spring}
+      />
+      <motion.line
+        x1="4" y1="12" x2="20" y2="12"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+        animate={open ? { opacity: 0, x: 8 } : { opacity: 1, x: 0 }}
+        transition={spring}
+      />
+      <motion.line
+        x1="4" y1="17" x2="20" y2="17"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+        animate={open ? { rotate: -45, y: -5, x1: 4, y1: 12, x2: 20, y2: 12 } : { rotate: 0, y: 0 }}
+        transition={spring}
+      />
+    </svg>
+  );
+}
+
 export default function Nav() {
+  const { theme, toggleTheme } = useTheme();
+  const t = useThemeStyles();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 40);
-    window.addEventListener('scroll', handler, { passive: true });
-    return () => window.removeEventListener('scroll', handler);
+    const onScroll = () => setScrolled(window.scrollY > 80);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
+
+  const scrollToTop = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   return (
     <>
-      <style>{`
-        .nav-link {
-          font-size: 14px; font-weight: 500;
-          color: rgba(241,245,249,0.55);
-          text-decoration: none;
-          transition: color 0.2s ease;
-          padding: 4px 0;
-          position: relative;
-        }
-        .nav-link::after {
-          content: '';
-          position: absolute; bottom: -2px; left: 0; right: 0; height: 1px;
-          background: linear-gradient(135deg, #7c3aed, #2563eb);
-          transform: scaleX(0); transform-origin: left;
-          transition: transform 0.25s ease;
-        }
-        .nav-link:hover { color: #f1f5f9; }
-        .nav-link:hover::after { transform: scaleX(1); }
-        .nav-cta {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 9px 20px; border-radius: 10px;
-          background: linear-gradient(135deg, #7c3aed, #2563eb);
-          color: white; font-weight: 700; font-size: 14px;
-          text-decoration: none;
-          box-shadow: 0 0 30px rgba(124,58,237,0.35);
-          transition: all 0.25s ease;
-        }
-        .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 40px rgba(124,58,237,0.5); }
-        .nav-signin { font-size: 14px; font-weight: 500; color: rgba(241,245,249,0.55); text-decoration: none; transition: color 0.2s; }
-        .nav-signin:hover { color: #f1f5f9; }
-      `}</style>
-
       <motion.header
-        initial={{ y: -70, opacity: 0 }}
+        initial={{ y: -80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ type: 'spring', stiffness: 200, damping: 28, delay: 0.1 }}
+        className="fixed top-0 left-0 right-0 z-50 px-6"
         style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-          padding: '0 24px',
-          transition: 'all 0.4s ease',
-          background: scrolled ? 'rgba(4,4,15,0.88)' : 'transparent',
-          backdropFilter: scrolled ? 'blur(24px)' : 'none',
-          borderBottom: scrolled ? '1px solid rgba(124,58,237,0.15)' : '1px solid transparent',
-          boxShadow: scrolled ? '0 0 40px rgba(124,58,237,0.05)' : 'none',
+          background:
+            scrolled ? t.navBg : t.isDark ? 'rgba(6,6,8,0.78)' : 'transparent',
+          backdropFilter: scrolled || t.isDark ? 'blur(20px)' : 'none',
+          WebkitBackdropFilter: scrolled || t.isDark ? 'blur(20px)' : 'none',
+          borderBottom:
+            scrolled || t.isDark
+              ? `1px solid ${scrolled ? t.navBorder : 'rgba(255,255,255,0.06)'}`
+              : '1px solid transparent',
+          transition: 'background 0.3s, backdrop-filter 0.3s, border-bottom 0.3s',
         }}
       >
-        <div style={{ maxWidth: 1200, margin: '0 auto', height: 68, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Logo */}
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-              background: 'linear-gradient(135deg, #7c3aed, #2563eb)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 20px rgba(124,58,237,0.5)',
-            }}>
-              <Layers size={17} color="white" strokeWidth={2} />
-            </div>
-            <span style={{ fontFamily: 'var(--font-syne, system-ui)', fontWeight: 800, fontSize: 18, color: '#f1f5f9', letterSpacing: '-0.03em' }}>
-              ImmerseTrain
-            </span>
-          </Link>
+        <div className="mx-auto flex h-[68px] max-w-[1280px] items-center justify-between gap-3">
+          {/* Logo — reserve space on small screens so it never collides with the menu control */}
+          <a
+            href="#"
+            onClick={scrollToTop}
+            className="font-clash min-w-0 shrink text-lg font-bold tracking-tight text-[var(--text-primary)] no-underline max-[420px]:max-w-[min(100%,11rem)] max-[420px]:truncate"
+          >
+            ImmerseTrain
+          </a>
 
-          {/* Desktop links */}
-          <nav className="hidden md:flex" style={{ alignItems: 'center', gap: 32 }}>
-            {NAV_LINKS.map(l => (
-              <a key={l.label} href={l.href} className="nav-link">{l.label}</a>
-            ))}
+          {/* Desktop nav */}
+          <nav className="hidden items-center gap-8 md:flex">
+            {NAV_LINKS.map((link) => {
+              const isExternal = link.href.startsWith('/');
+              const El = isExternal ? Link : 'a';
+              return (
+                <El
+                  key={link.label}
+                  href={link.href}
+                  className="nav-link group relative py-1 text-sm font-medium text-[var(--text-secondary)] transition-colors duration-200 hover:text-[var(--text-primary)]"
+                >
+                  {link.label}
+                  <span className="absolute bottom-0 left-0 h-px w-full origin-left scale-x-0 bg-[var(--indigo)] transition-transform duration-300 group-hover:scale-x-100" />
+                </El>
+              );
+            })}
           </nav>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <Link href="/sign-in" className="nav-signin hidden md:inline">Sign in</Link>
-            <Link href="/sign-up" className="nav-cta">
-              Start Free <ChevronRight size={14} />
-            </Link>
+          {/* Right actions */}
+          <div className="flex shrink-0 items-center gap-4 sm:gap-5">
             <button
-              className="md:hidden"
-              onClick={() => setMobileOpen(v => !v)}
-              style={{ background: 'none', border: 'none', color: '#f1f5f9', cursor: 'pointer', padding: 4 }}
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                border: `1px solid ${t.border}`,
+                background: t.surface,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                color: t.textFaint,
+              }}
             >
-              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+              {theme === 'dark' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              )}
+            </button>
+            <Link
+              href="/sign-in"
+              className="hidden text-sm font-medium text-[var(--text-secondary)] transition-colors duration-200 hover:text-[var(--text-primary)] md:inline"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/sign-up"
+              className="hidden rounded-full bg-[var(--indigo)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(91,76,255,0.35)] transition-all duration-200 hover:-translate-y-px hover:shadow-[0_4px_32px_rgba(91,76,255,0.5)] md:inline-flex"
+            >
+              Start Free
+            </Link>
+
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileOpen((v) => !v)}
+              className="relative z-[110] text-[var(--text-primary)] md:hidden"
+              aria-label="Toggle menu"
+            >
+              <HamburgerIcon open={mobileOpen} />
             </button>
           </div>
         </div>
       </motion.header>
 
-      {/* Mobile menu */}
+      {/* Mobile overlay */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              position: 'fixed', top: 68, left: 0, right: 0, zIndex: 99,
-              background: 'rgba(4,4,15,0.97)', backdropFilter: 'blur(24px)',
-              borderBottom: '1px solid rgba(124,58,237,0.15)',
-              overflow: 'hidden',
-            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[100] flex flex-col backdrop-blur-2xl md:hidden"
+            style={{ background: t.isDark ? 'rgba(6,6,8,0.97)' : 'rgba(255,255,255,0.97)' }}
           >
-            <div style={{ padding: '20px 24px 28px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {NAV_LINKS.map((l, i) => (
-                <motion.a
-                  key={l.label}
-                  href={l.href}
-                  initial={{ opacity: 0, x: -12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.06 }}
-                  onClick={() => setMobileOpen(false)}
-                  style={{ padding: '14px 0', fontSize: 18, fontWeight: 600, color: 'rgba(241,245,249,0.7)', textDecoration: 'none', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
-                >
-                  {l.label}
-                </motion.a>
-              ))}
-              <Link href="/sign-up" onClick={() => setMobileOpen(false)} style={{
-                marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '14px', borderRadius: 12,
-                background: 'linear-gradient(135deg, #7c3aed, #2563eb)',
-                color: 'white', fontWeight: 700, fontSize: 16, textDecoration: 'none',
-              }}>
-                Start Free Trial
+            <div className="flex h-[68px] shrink-0 items-center px-6">
+              <span className="font-clash text-lg font-bold text-[var(--text-primary)]">
+                ImmerseTrain
+              </span>
+            </div>
+
+            <nav className="flex flex-1 flex-col justify-center gap-2 px-8">
+              {NAV_LINKS.map((link, i) => {
+                const isExternal = link.href.startsWith('/');
+                const El = isExternal ? Link : 'a';
+                return (
+                  <motion.div
+                    key={link.label}
+                    initial={{ opacity: 0, x: -24 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -24 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 30, delay: i * 0.06 }}
+                  >
+                    <El
+                      href={link.href}
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-4 font-clash text-3xl font-semibold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      {link.label}
+                    </El>
+                  </motion.div>
+                );
+              })}
+            </nav>
+
+            <div className="flex flex-col gap-3 px-8 pb-12">
+              <Link
+                href="/sign-in"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-xl py-4 text-center text-base font-medium text-[var(--text-secondary)]"
+                style={{ border: `1px solid ${t.border}` }}
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/sign-up"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-xl bg-[var(--indigo)] py-4 text-center text-base font-semibold text-white shadow-[0_0_30px_rgba(91,76,255,0.35)]"
+              >
+                Start Free
               </Link>
             </div>
           </motion.div>

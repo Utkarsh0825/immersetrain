@@ -1,6 +1,7 @@
-import { redirect } from 'next/navigation';
+'use client';
 
-/** Demo mode: authentication disabled — send users to the dashboard. */
+import AuthShell from '@/components/auth/AuthShell';
+
 export default function SignUpPage() {
-  redirect('/dashboard');
+  return <AuthShell variant="sign-up" />;
 }

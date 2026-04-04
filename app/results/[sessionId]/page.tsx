@@ -132,7 +132,7 @@ export default function ResultsPage() {
             fontFamily: 'var(--font-syne, system-ui)', fontSize: 'clamp(26px, 4vw, 38px)',
             fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 10px',
           }}>
-            {result.passed ? '🎉 Training Passed!' : 'Training Complete'}
+            {result.passed ? 'Training Passed!' : 'Training Complete'}
           </h1>
           <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
             {result.userName} &nbsp;·&nbsp; {result.scenarioTitle}
