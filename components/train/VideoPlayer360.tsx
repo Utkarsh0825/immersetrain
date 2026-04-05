@@ -26,10 +26,11 @@ type ASceneEl = HTMLElement & {
   enterVR?: () => void;
 };
 
+const AFRAME_SCRIPT_ID = 'immersetrain-aframe-160';
 const RETRY_DELAY_MS = 350;
 const MAX_PLAY_RETRIES = 4;
-/** Scene “loaded” must not depend on the MP4 finishing — that was blocking the whole flow inside <a-assets>. */
 const SCENE_READY_TIMEOUT_MS = 8000;
+const VIDEO_FIND_TIMEOUT_MS = 6000;
 
 function waitSceneReady(scene: ASceneEl | null): Promise<void> {
   if (!scene) return Promise.resolve();
@@ -51,6 +52,43 @@ function waitSceneReady(scene: ASceneEl | null): Promise<void> {
   });
 }
 
+/** One shared loader so Strict Mode remounts and route changes do not duplicate A-Frame / THREE. */
+function loadAframeScriptOnce(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (window.AFRAME) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById(AFRAME_SCRIPT_ID) as HTMLScriptElement | null;
+    if (existing) {
+      if (window.AFRAME) {
+        resolve();
+        return;
+      }
+      existing.addEventListener(
+        'load',
+        () => {
+          if (window.AFRAME) resolve();
+          else reject(new Error('A-Frame script present but AFRAME missing'));
+        },
+        { once: true }
+      );
+      existing.addEventListener('error', () => reject(new Error('A-Frame load error')), { once: true });
+      queueMicrotask(() => {
+        if (window.AFRAME) resolve();
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = AFRAME_SCRIPT_ID;
+    script.async = true;
+    script.src = 'https://aframe.io/releases/1.6.0/aframe.min.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load A-Frame'));
+    document.head.appendChild(script);
+  });
+}
+
 async function playWithRetries(video: HTMLVideoElement, muted: boolean): Promise<void> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < MAX_PLAY_RETRIES; attempt++) {
@@ -66,16 +104,33 @@ async function playWithRetries(video: HTMLVideoElement, muted: boolean): Promise
   throw lastErr;
 }
 
+async function waitForVideoInContainer(
+  container: HTMLElement | null,
+  cancelled: () => boolean
+): Promise<HTMLVideoElement | null> {
+  const start = Date.now();
+  while (Date.now() - start < VIDEO_FIND_TIMEOUT_MS && !cancelled()) {
+    const v = container?.querySelector('#trainingvideo') as HTMLVideoElement | null;
+    if (v) return v;
+    await new Promise((r) => setTimeout(r, 80));
+  }
+  return null;
+}
+
 const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
   ({ videoUrl, onReady }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const sceneElRef = useRef<ASceneEl | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const resolvedSrcRef = useRef('');
-    const aframeLoaded = useRef(false);
     const timeCallbacks = useRef<Set<(t: number) => void>>(new Set());
+    const onReadyRef = useRef(onReady);
+    onReadyRef.current = onReady;
+
     const [overlayState, setOverlayState] = useState<'visible' | 'fading' | 'gone'>('visible');
     const [videoBuffering, setVideoBuffering] = useState(false);
     const startInProgress = useRef(false);
+    const aliveRef = useRef(true);
 
     const attachVideoListeners = useCallback((videoEl: HTMLVideoElement, resolvedSrc: string) => {
       resolvedSrcRef.current = resolvedSrc;
@@ -109,15 +164,17 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       const abortClear = window.setTimeout(() => {
         setVideoBuffering(false);
         startInProgress.current = false;
-      }, 15000);
+      }, 20000);
 
       try {
-        const scene = document.querySelector('a-scene') as ASceneEl | null;
+        const container = containerRef.current;
+        const scene = container?.querySelector('a-scene') as ASceneEl | null;
+        sceneElRef.current = scene;
         await waitSceneReady(scene);
 
-        const videoEl = document.getElementById('trainingvideo') as HTMLVideoElement | null;
+        const videoEl = await waitForVideoInContainer(container, () => !aliveRef.current);
         if (!videoEl) {
-          console.error('[VideoPlayer360] no #trainingvideo');
+          console.error('[VideoPlayer360] no #trainingvideo inside player container after wait');
           return;
         }
 
@@ -126,7 +183,6 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         const hideBuffering = () => setVideoBuffering(false);
         videoEl.addEventListener('playing', hideBuffering, { once: true });
 
-        // User just tapped “start” — treat as unlock: get picture + sound going fast.
         videoEl.muted = true;
         try {
           await playWithRetries(videoEl, true);
@@ -135,7 +191,6 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           await videoEl.play().catch(() => {});
         }
 
-        // Unmute right after playback begins (same gesture stack); optional micro-delay for texture.
         requestAnimationFrame(() => {
           videoEl.muted = false;
           void videoEl.play().catch(() => {});
@@ -164,7 +219,9 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         return () => timeCallbacks.current.delete(cb);
       },
       enterVR: () => {
-        const scene = document.querySelector('a-scene') as ASceneEl | null;
+        const scene =
+          sceneElRef.current ??
+          (containerRef.current?.querySelector('a-scene') as ASceneEl | null);
         scene?.enterVR?.();
       },
     }));
@@ -180,34 +237,45 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     }, [overlayState, startVideoSequence]);
 
     useEffect(() => {
-      if (aframeLoaded.current || typeof window === 'undefined') return;
-      aframeLoaded.current = true;
+      if (typeof window === 'undefined') return;
 
-      const loadAFrame = () => {
+      let cancelled = false;
+      aliveRef.current = true;
+
+      const mount = async () => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        try {
+          await loadAframeScriptOnce();
+        } catch (e) {
+          console.error('[VideoPlayer360]', e);
+          return;
+        }
+        if (cancelled || !containerRef.current) return;
+
         const origin = window.location.origin;
         const resolvedSrc = videoUrl.startsWith('/') ? `${origin}${videoUrl}` : videoUrl;
         resolvedSrcRef.current = resolvedSrc;
 
-        // Video is NOT inside <a-assets> — that was blocking scene "loaded" until the whole MP4 buffered.
-        const sceneHTML = `
+        /* src set in JS so query strings / encoding never break the inline scene HTML */
+        container.innerHTML = `
           <a-scene
             embedded
             style="height:100%;width:100%;position:absolute;top:0;left:0"
-            renderer="colorManagement: true; physicallyCorrectLights: false"
+            renderer="colorManagement: true"
             loading-screen="enabled: false"
             vr-mode-ui="enabled: true"
             device-orientation-permission-ui="enabled: true"
           >
             <video
               id="trainingvideo"
-              src="${resolvedSrc}"
               muted
               playsinline
               webkit-playsinline
               crossorigin="anonymous"
               loop="false"
               preload="auto"
-              x-webkit-airplay="allow"
               style="display:none;width:2px;height:2px;position:absolute;left:-9999px"
             ></video>
             <a-videosphere
@@ -228,54 +296,44 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           </a-scene>
         `;
 
-        if (containerRef.current) {
-          containerRef.current.innerHTML = sceneHTML;
-
-          const wireReady = (scene: ASceneEl | null) => {
-            const finish = () => {
-              const videoEl = document.getElementById('trainingvideo') as HTMLVideoElement | null;
-              if (videoEl) {
-                attachVideoListeners(videoEl, resolvedSrc);
-                onReady?.();
-              }
-            };
-            if (!scene) {
-              window.setTimeout(finish, 0);
-              return;
-            }
-            if (scene.hasLoaded) finish();
-            else scene.addEventListener('loaded', finish, { once: true });
-          };
-
-          const scene = containerRef.current.querySelector('a-scene') as ASceneEl | null;
-          wireReady(scene);
+        const videoEl = container.querySelector('#trainingvideo') as HTMLVideoElement | null;
+        if (videoEl) {
+          videoEl.src = resolvedSrc;
+          videoEl.load();
         }
+
+        const scene = container.querySelector('a-scene') as ASceneEl | null;
+        sceneElRef.current = scene;
+
+        const finishReady = () => {
+          if (cancelled || !containerRef.current) return;
+          const v = containerRef.current.querySelector('#trainingvideo') as HTMLVideoElement | null;
+          if (v) {
+            attachVideoListeners(v, resolvedSrc);
+            onReadyRef.current?.();
+          }
+        };
+
+        if (!scene) {
+          window.setTimeout(finishReady, 0);
+          return;
+        }
+        if (scene.hasLoaded) finishReady();
+        else scene.addEventListener('loaded', finishReady, { once: true });
       };
 
-      if (window.AFRAME) {
-        loadAFrame();
-        return () => {
-          if (containerRef.current) containerRef.current.innerHTML = '';
-        };
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://aframe.io/releases/1.6.0/aframe.min.js';
-      script.onload = loadAFrame;
-      script.onerror = () => console.error('Failed to load A-Frame');
-      document.head.appendChild(script);
-
-      const poly = document.createElement('script');
-      poly.src = 'https://unpkg.com/webvr-polyfill@0.10.12/build/webvr-polyfill.js';
-      poly.async = true;
-      document.head.appendChild(poly);
+      void mount();
 
       return () => {
+        cancelled = true;
+        aliveRef.current = false;
+        sceneElRef.current = null;
+        videoRef.current = null;
         if (containerRef.current) {
           containerRef.current.innerHTML = '';
         }
       };
-    }, [videoUrl, onReady, attachVideoListeners]);
+    }, [videoUrl, attachVideoListeners]);
 
     const showOverlay = overlayState !== 'gone';
 
