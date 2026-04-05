@@ -1,10 +1,7 @@
 'use client';
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import { Play } from 'lucide-react';
-import {
-  requestElementFullscreen,
-  tryLockLandscapeForHeadset,
-} from '@/lib/requestFullscreen';
+import { enterTrainImmersive } from '@/lib/trainImmersive';
 
 export interface VideoPlayer360Handle {
   play: () => void;
@@ -238,8 +235,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       if (overlayState !== 'visible') return;
       /* Fullscreen + orientation must run in the same user gesture as the tap (mobile). */
       if (fullscreenOnStart && fullscreenRootRef?.current) {
-        requestElementFullscreen(fullscreenRootRef.current);
-        tryLockLandscapeForHeadset();
+        enterTrainImmersive(fullscreenRootRef.current);
       }
       setOverlayState('fading');
       window.setTimeout(() => {
@@ -471,7 +467,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               }}
             >
               {fullscreenOnStart
-                ? 'Opens fullscreen for your phone headset. Move your head to look around (allow motion if prompted).'
+                ? 'Uses full screen on your phone (Android: browser fullscreen; iPhone: edge-to-edge view—like inline YouTube, but for 360°). Allow motion if prompted, then move your head to look around.'
                 : 'Drag to look around. Dedicated VR headsets can use the scene’s VR control when available.'}
             </p>
           </div>

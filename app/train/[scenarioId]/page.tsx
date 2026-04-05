@@ -14,7 +14,7 @@ import QuizOverlay from '@/components/train/QuizOverlay';
 import ProgressBar from '@/components/train/ProgressBar';
 import ScoreHUD from '@/components/train/ScoreHUD';
 import type { VideoPlayer360Handle } from '@/components/train/VideoPlayer360';
-import { exitDocumentFullscreen } from '@/lib/requestFullscreen';
+import { exitTrainImmersive, isAppleMobileWebKit } from '@/lib/trainImmersive';
 
 const VideoPlayer360 = dynamic(() => import('@/components/train/VideoPlayer360'), {
   ssr: false,
@@ -45,6 +45,7 @@ export default function TrainPage() {
       navigator.maxTouchPoints > 0
     );
   });
+  const [appleMobile, setAppleMobile] = useState(false);
 
   const playerRef = useRef<VideoPlayer360Handle>(null);
   const trainShellRef = useRef<HTMLDivElement>(null);
@@ -170,6 +171,12 @@ export default function TrainPage() {
     return () => mq.removeEventListener('change', check);
   }, []);
 
+  useEffect(() => () => exitTrainImmersive(), []);
+
+  useEffect(() => {
+    setAppleMobile(isAppleMobileWebKit());
+  }, []);
+
   if (loading) {
     return (
       <div style={{ height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
@@ -207,7 +214,7 @@ export default function TrainPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'all' }}>
           <Link
             href="/dashboard"
-            onClick={() => exitDocumentFullscreen()}
+            onClick={() => exitTrainImmersive()}
             style={{
               width: 36, height: 36, borderRadius: 10, flexShrink: 0,
               background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
@@ -306,7 +313,9 @@ export default function TrainPage() {
           backdropFilter: 'blur(8px)', letterSpacing: '0.02em',
         }}>
           {isTouchLike
-            ? 'Fullscreen + motion: allow orientation if asked · Back exits'
+            ? appleMobile
+              ? 'iPhone/iPad: immersive view after Start (iOS WebKit) · allow motion · Back exits'
+              : 'Android: browser fullscreen after Start · allow motion · Back exits'
             : 'Drag to look · Quest / PC VR: use scene VR when shown'}
         </div>
       )}
