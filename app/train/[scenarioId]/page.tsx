@@ -14,6 +14,7 @@ import QuizOverlay from '@/components/train/QuizOverlay';
 import ProgressBar from '@/components/train/ProgressBar';
 import ScoreHUD from '@/components/train/ScoreHUD';
 import type { VideoPlayer360Handle } from '@/components/train/VideoPlayer360';
+import { exitDocumentFullscreen } from '@/lib/requestFullscreen';
 
 const VideoPlayer360 = dynamic(() => import('@/components/train/VideoPlayer360'), {
   ssr: false,
@@ -36,10 +37,17 @@ export default function TrainPage() {
   const [loading, setLoading] = useState(true);
   const [playerReady, setPlayerReady] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [isTouchLike, setIsTouchLike] = useState(false);
-  const [cardboardTransition, setCardboardTransition] = useState(false);
+  const [isTouchLike, setIsTouchLike] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.matchMedia('(max-width: 1024px)').matches ||
+      'ontouchstart' in window ||
+      navigator.maxTouchPoints > 0
+    );
+  });
 
   const playerRef = useRef<VideoPlayer360Handle>(null);
+  const trainShellRef = useRef<HTMLDivElement>(null);
   const isPausedRef = useRef(false);
   const cleanupTimeUpdate = useRef<(() => void) | null>(null);
 
@@ -162,15 +170,6 @@ export default function TrainPage() {
     return () => mq.removeEventListener('change', check);
   }, []);
 
-  useEffect(() => {
-    if (!cardboardTransition) return;
-    const id = window.setTimeout(() => {
-      playerRef.current?.enterVR();
-      setCardboardTransition(false);
-    }, 640);
-    return () => window.clearTimeout(id);
-  }, [cardboardTransition]);
-
   if (loading) {
     return (
       <div style={{ height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
@@ -182,7 +181,19 @@ export default function TrainPage() {
   }
 
   return (
-    <div style={{ height: '100vh', width: '100vw', background: '#000', position: 'relative', overflow: 'hidden' }}>
+    <div
+      ref={trainShellRef}
+      data-train-fullscreen-root
+      style={{
+        minHeight: '100dvh',
+        height: '100vh',
+        width: '100%',
+        maxWidth: '100vw',
+        background: '#000',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
 
       {/* ── Top HUD ── */}
       <div style={{
@@ -194,12 +205,16 @@ export default function TrainPage() {
       }}>
         {/* Back + title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'all' }}>
-          <Link href="/dashboard" style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', textDecoration: 'none',
-          }}>
+          <Link
+            href="/dashboard"
+            onClick={() => exitDocumentFullscreen()}
+            style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', textDecoration: 'none',
+            }}
+          >
             <ArrowLeft size={15} />
           </Link>
           <div style={{ minWidth: 0 }}>
@@ -223,116 +238,12 @@ export default function TrainPage() {
       <VideoPlayer360
         ref={playerRef}
         videoUrl={scenario?.video_url ?? DEMO_SCENARIO.video_url}
+        fullscreenRootRef={trainShellRef}
+        fullscreenOnStart={isTouchLike}
         onReady={() => {
           setPlayerReady(true);
         }}
       />
-
-      {/* Framer “twin lens” beat before A-Frame splits stereo (Cardboard) */}
-      <AnimatePresence>
-        {cardboardTransition && (
-          <motion.div
-            key="cardboard-lenses"
-            role="presentation"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 10000,
-              background: 'radial-gradient(ellipse at center, rgba(0,102,255,0.12) 0%, rgba(0,0,0,0.96) 55%)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 28,
-              pointerEvents: 'none',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'clamp(12px, 6vw, 36px)' }}>
-              <motion.div
-                initial={{ scale: 0.5, opacity: 0, x: 36 }}
-                animate={{ scale: 1, opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 22, delay: 0.05 }}
-                style={{
-                  width: 'clamp(72px, 22vw, 120px)',
-                  height: 'clamp(72px, 22vw, 120px)',
-                  borderRadius: '50%',
-                  border: '3px solid rgba(255,255,255,0.45)',
-                  boxShadow: '0 0 40px rgba(0,102,255,0.25), inset 0 0 24px rgba(0,102,255,0.08)',
-                  background: 'rgba(0,0,0,0.35)',
-                }}
-              />
-              <motion.div
-                initial={{ scale: 0.5, opacity: 0, x: -36 }}
-                animate={{ scale: 1, opacity: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 22, delay: 0.08 }}
-                style={{
-                  width: 'clamp(72px, 22vw, 120px)',
-                  height: 'clamp(72px, 22vw, 120px)',
-                  borderRadius: '50%',
-                  border: '3px solid rgba(255,255,255,0.45)',
-                  boxShadow: '0 0 40px rgba(0,102,255,0.25), inset 0 0 24px rgba(0,102,255,0.08)',
-                  background: 'rgba(0,0,0,0.35)',
-                }}
-              />
-            </div>
-            <motion.p
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              style={{
-                margin: 0,
-                fontFamily: 'var(--font-syne, system-ui)',
-                fontSize: 17,
-                fontWeight: 700,
-                color: 'rgba(255,255,255,0.92)',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              Entering stereo view…
-            </motion.p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {playerReady && !completed && isTouchLike && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 72,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 9998,
-            pointerEvents: 'auto',
-          }}
-        >
-          <motion.button
-            type="button"
-            disabled={cardboardTransition}
-            whileTap={{ scale: 0.97 }}
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            onClick={() => setCardboardTransition(true)}
-            style={{
-              padding: '12px 22px',
-              borderRadius: 999,
-              border: '2px solid rgba(255,255,255,0.35)',
-              background: 'rgba(0,0,0,0.82)',
-              color: 'white',
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: cardboardTransition ? 'wait' : 'pointer',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}><rect x="2" y="7" width="20" height="10" rx="3" /><circle cx="8" cy="12" r="2" /><circle cx="16" cy="12" r="2" /><path d="M10 12h4" /></svg>
-            Enter Cardboard mode
-          </motion.button>
-        </div>
-      )}
 
       {/* ── Quiz overlay ── */}
       <AnimatePresence>
@@ -394,7 +305,9 @@ export default function TrainPage() {
           background: 'rgba(0,0,0,0.5)', borderRadius: 8, padding: '6px 12px',
           backdropFilter: 'blur(8px)', letterSpacing: '0.02em',
         }}>
-          Drag to look · Quest: VR icon · Phone: Cardboard button below
+          {isTouchLike
+            ? 'Fullscreen + motion: allow orientation if asked · Back exits'
+            : 'Drag to look · Quest / PC VR: use scene VR when shown'}
         </div>
       )}
 

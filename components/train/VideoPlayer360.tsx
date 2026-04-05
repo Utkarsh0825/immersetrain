@@ -1,6 +1,10 @@
 'use client';
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import { Play } from 'lucide-react';
+import {
+  requestElementFullscreen,
+  tryLockLandscapeForHeadset,
+} from '@/lib/requestFullscreen';
 
 export interface VideoPlayer360Handle {
   play: () => void;
@@ -13,6 +17,10 @@ export interface VideoPlayer360Handle {
 interface VideoPlayer360Props {
   videoUrl: string;
   onReady?: () => void;
+  /** Training page root — fullscreen on the same tap as “Start” (phone + headset). */
+  fullscreenRootRef?: React.RefObject<HTMLElement | null>;
+  /** When true with fullscreenRootRef, enter fullscreen immediately on user start tap. */
+  fullscreenOnStart?: boolean;
 }
 
 declare global {
@@ -118,7 +126,7 @@ async function waitForVideoInContainer(
 }
 
 const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
-  ({ videoUrl, onReady }, ref) => {
+  ({ videoUrl, onReady, fullscreenRootRef, fullscreenOnStart }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const sceneElRef = useRef<ASceneEl | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -228,13 +236,18 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
     const handleStartClick = useCallback(() => {
       if (overlayState !== 'visible') return;
+      /* Fullscreen + orientation must run in the same user gesture as the tap (mobile). */
+      if (fullscreenOnStart && fullscreenRootRef?.current) {
+        requestElementFullscreen(fullscreenRootRef.current);
+        tryLockLandscapeForHeadset();
+      }
       setOverlayState('fading');
       window.setTimeout(() => {
         setOverlayState('gone');
         setVideoBuffering(true);
         void startVideoSequence();
       }, 280);
-    }, [overlayState, startVideoSequence]);
+    }, [overlayState, startVideoSequence, fullscreenOnStart, fullscreenRootRef]);
 
     useEffect(() => {
       if (typeof window === 'undefined') return;
@@ -259,13 +272,14 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         resolvedSrcRef.current = resolvedSrc;
 
         /* src set in JS so query strings / encoding never break the inline scene HTML */
+        const stereoUi = fullscreenOnStart ? 'false' : 'true';
         container.innerHTML = `
           <a-scene
             embedded
             style="height:100%;width:100%;position:absolute;top:0;left:0"
             renderer="colorManagement: true"
             loading-screen="enabled: false"
-            vr-mode-ui="enabled: true"
+            vr-mode-ui="enabled: ${stereoUi}"
             device-orientation-permission-ui="enabled: true"
           >
             <video
@@ -333,7 +347,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           containerRef.current.innerHTML = '';
         }
       };
-    }, [videoUrl, attachVideoListeners]);
+    }, [videoUrl, attachVideoListeners, fullscreenOnStart]);
 
     const showOverlay = overlayState !== 'gone';
 
@@ -443,7 +457,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 padding: '0 24px',
               }}
             >
-              Click to Start 360° Training
+              {fullscreenOnStart ? 'Tap to Start 360° Training' : 'Click to Start 360° Training'}
             </p>
             <p
               style={{
@@ -451,12 +465,14 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 fontSize: 15,
                 color: 'rgba(255,255,255,0.72)',
                 textAlign: 'center',
-                maxWidth: 360,
+                maxWidth: 380,
                 padding: '0 24px',
                 lineHeight: 1.5,
               }}
             >
-              Drag to look around. Use the VR icon or Cardboard on phone for stereo view.
+              {fullscreenOnStart
+                ? 'Opens fullscreen for your phone headset. Move your head to look around (allow motion if prompted).'
+                : 'Drag to look around. Dedicated VR headsets can use the scene’s VR control when available.'}
             </p>
           </div>
         )}
