@@ -30,6 +30,13 @@ npx ts-node supabase/seed.ts
 ```
 Verify data appears in Supabase Table Editor.
 
+## Creator Platform — Storage Bucket (Required)
+In Supabase Dashboard → Storage → New bucket:
+  Name: scenario-videos
+  Public: YES
+  File size limit: 500 MB
+  Allowed MIME types: video/mp4, video/quicktime, video/webm, video/*
+
 ## Step 5 — Run Locally
 ```bash
 npm run dev
@@ -80,6 +87,25 @@ Open [http://localhost:3000](http://localhost:3000)
 2. Navigate to your Vercel URL
 3. Tap the **VR goggles icon** in the A-Frame player
 4. Use **gaze cursor** (look at answer for 1.5 seconds) to select answers
+
+---
+
+## Enable Google Sign-In (5 minutes)
+1. Go to console.cloud.google.com
+2. Create new project → "ImmerseTrain"
+3. APIs & Services → Credentials → Create OAuth Client ID
+4. Application type: Web application
+5. Authorized redirect URIs:
+   https://accounts.clerk.dev/v1/oauth_callback
+6. Copy Client ID and Client Secret
+
+7. Go to Clerk Dashboard → User & Authentication →
+   Social Connections → Google → Enable
+8. Paste Client ID and Client Secret
+9. Save
+
+Google sign-in now appears automatically on sign-in/sign-up pages.
+No code changes needed.
 
 ---
 

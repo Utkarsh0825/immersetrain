@@ -7,6 +7,8 @@ export interface VideoPlayer360Handle {
   play: () => void;
   pause: () => void;
   getCurrentTime: () => number;
+  getDuration: () => number;
+  seek: (timeSeconds: number) => void;
   onTimeUpdate: (cb: (time: number) => void) => () => void;
   enterVR: () => void;
 }
@@ -219,6 +221,15 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         videoRef.current?.pause();
       },
       getCurrentTime: () => videoRef.current?.currentTime ?? 0,
+      getDuration: () => videoRef.current?.duration ?? 0,
+      seek: (timeSeconds: number) => {
+        const v = videoRef.current;
+        if (!v) return;
+        const t = Number.isFinite(timeSeconds) ? Math.max(0, timeSeconds) : 0;
+        try {
+          v.currentTime = t;
+        } catch {}
+      },
       onTimeUpdate: (cb) => {
         timeCallbacks.current.add(cb);
         return () => timeCallbacks.current.delete(cb);

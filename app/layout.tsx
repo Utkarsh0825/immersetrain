@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, Syne } from 'next/font/google';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { Toaster } from 'sonner';
 import './globals.css';
 
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'], display: 'swap' });
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           {children}
+          <Toaster position="top-right" theme="dark" />
         </ThemeProvider>
       </body>
     </html>
