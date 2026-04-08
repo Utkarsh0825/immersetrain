@@ -168,6 +168,14 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     const inFreezeRef = useRef<boolean>(false);
     const freezeCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const sphereRef = useRef<HTMLElement | null>(null);
+    const vrStartScreenRef = useRef<HTMLElement | null>(null);
+    const questRef = useRef(false);
+    const vrVideoStartedRef = useRef(false);
+    const vrStartHandlersRef = useRef<{
+      click?: ((e: Event) => void) | null;
+      trigger?: ((e: Event) => void) | null;
+      select?: ((e: Event) => void) | null;
+    }>({});
     const vrElsRef = useRef<{
       panel?: HTMLElement | null;
       cursor?: HTMLElement | null;
@@ -393,6 +401,49 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       window.setTimeout(() => swapBack(), 300);
     }, []);
 
+    const startVrVideoFromGesture = useCallback(() => {
+      const scene = sceneElRef.current as any;
+      const v = videoRef.current;
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
+      const startUi =
+        vrStartScreenRef.current ?? (containerRef.current?.querySelector('#vr-start-screen') as HTMLElement | null);
+      if (!scene || !v || !sphere) return;
+      if (vrVideoStartedRef.current) return;
+      try {
+        if (typeof scene?.is === 'function' && !scene.is('vr-mode')) return;
+      } catch {}
+
+      vrVideoStartedRef.current = true;
+      try {
+        startUi?.setAttribute('visible', 'false');
+      } catch {}
+
+      // KEY: play() invoked from user gesture inside WebXR session.
+      v.muted = false;
+      void v
+        .play()
+        .then(() => {
+          try {
+            sphere.setAttribute('src', '#trainingvideo');
+          } catch {}
+        })
+        .catch(() => {
+          // fallback: start muted, then unmute shortly after
+          try {
+            v.muted = true;
+          } catch {}
+          void v.play().catch(() => {});
+          try {
+            sphere.setAttribute('src', '#trainingvideo');
+          } catch {}
+          window.setTimeout(() => {
+            try {
+              v.muted = false;
+            } catch {}
+          }, 900);
+        });
+    }, []);
+
     const startVideoSequence = useCallback(async () => {
       if (startInProgress.current) return;
       startInProgress.current = true;
@@ -573,6 +624,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         resolvedSrcRef.current = resolvedSrc;
 
         /* src set in JS so query strings / encoding never break the inline scene HTML */
+        questRef.current = /OculusBrowser|Quest/i.test(window.navigator.userAgent ?? '');
         // VR button can be enabled again: quizzes render inside the scene for WebXR.
         const stereoUi = 'true';
         container.innerHTML = `
@@ -604,6 +656,37 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
             ></a-videosphere>
             <a-entity id="camera-rig" position="0 1.6 0">
               <a-camera id="main-camera" look-controls="pointerLockEnabled: false" wasd-controls="enabled: false">
+                <a-entity id="vr-start-screen" visible="false">
+                  <a-plane
+                    position="0 0 -2"
+                    width="2.5"
+                    height="1.2"
+                    material="color: #0d0d18; opacity: 0.95; shader: flat; side: double"
+                  ></a-plane>
+                  <a-text
+                    value="ImmerseTrain"
+                    color="#5B4CFF"
+                    align="center"
+                    width="3"
+                    position="0 0.35 -1.99"
+                  ></a-text>
+                  <a-text
+                    value="Press trigger or tap to begin training"
+                    color="#FFFFFF"
+                    align="center"
+                    width="2.8"
+                    position="0 0 -1.99"
+                  ></a-text>
+                  <a-ring
+                    position="0 -0.35 -1.99"
+                    radius-inner="0.08"
+                    radius-outer="0.12"
+                    color="#5B4CFF"
+                    material="shader: flat"
+                    animation="property: scale; to: 1.3 1.3 1; dur: 1000; loop: true; dir: alternate; easing: easeInOutSine"
+                  ></a-ring>
+                </a-entity>
+
                 <a-entity
                   id="gaze-cursor"
                   cursor="fuse: true; fuseTimeout: 1500"
@@ -666,6 +749,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         sceneElRef.current = scene;
         sphereRef.current = container.querySelector('#immersive-sphere') as HTMLElement | null;
         freezeCanvasRef.current = container.querySelector('#freezeCanvas') as HTMLCanvasElement | null;
+        vrStartScreenRef.current = container.querySelector('#vr-start-screen') as HTMLElement | null;
 
         const finishReady = () => {
           if (cancelled || !containerRef.current) return;
@@ -686,14 +770,49 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           const enter = () => {
             setInVr(true);
             onVrModeChange?.(true);
+
+            // Quest: require an in-VR gesture to start video decode reliably.
+            if (questRef.current) {
+              vrVideoStartedRef.current = false;
+              try {
+                vrStartScreenRef.current?.setAttribute('visible', 'true');
+              } catch {}
+              try {
+                // Delay binding sphere until play succeeds inside VR.
+                sphereRef.current?.setAttribute('src', '');
+              } catch {}
+              try {
+                if (videoRef.current) videoRef.current.muted = true;
+              } catch {}
+            }
           };
           const exit = () => {
             setInVr(false);
             onVrModeChange?.(false);
             hideVrQuiz();
+            if (questRef.current) {
+              vrVideoStartedRef.current = false;
+              try {
+                vrStartScreenRef.current?.setAttribute('visible', 'false');
+              } catch {}
+              // Restore normal binding on exit.
+              try {
+                sphereRef.current?.setAttribute('src', '#trainingvideo');
+              } catch {}
+            }
           };
           sceneElRef.current?.addEventListener('enter-vr', enter);
           sceneElRef.current?.addEventListener('exit-vr', exit);
+
+          // Gesture listeners inside VR (Quest).
+          const handlers = vrStartHandlersRef.current;
+          handlers.click = () => startVrVideoFromGesture();
+          handlers.trigger = () => startVrVideoFromGesture();
+          handlers.select = () => startVrVideoFromGesture();
+          sceneElRef.current?.addEventListener('click', handlers.click);
+          sceneElRef.current?.addEventListener('triggerdown', handlers.trigger);
+          sceneElRef.current?.addEventListener('select', handlers.select);
+
           // If already in vr-mode, sync.
           try {
             if (typeof s?.is === 'function' && s.is('vr-mode')) {
@@ -736,13 +855,20 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       return () => {
         cancelled = true;
         aliveRef.current = false;
+        // Remove VR gesture listeners if present.
+        if (sceneElRef.current) {
+          const handlers = vrStartHandlersRef.current;
+          if (handlers.click) sceneElRef.current.removeEventListener('click', handlers.click);
+          if (handlers.trigger) sceneElRef.current.removeEventListener('triggerdown', handlers.trigger);
+          if (handlers.select) sceneElRef.current.removeEventListener('select', handlers.select);
+        }
         sceneElRef.current = null;
         videoRef.current = null;
         if (containerRef.current) {
           containerRef.current.innerHTML = '';
         }
       };
-    }, [videoUrl, attachVideoListeners, fullscreenOnStart, hideVrQuiz, onVrModeChange]);
+    }, [videoUrl, attachVideoListeners, fullscreenOnStart, hideVrQuiz, onVrModeChange, startVrVideoFromGesture]);
 
     const showOverlay = overlayState !== 'gone';
 
