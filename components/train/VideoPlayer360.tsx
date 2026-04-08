@@ -169,6 +169,8 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     const freezeCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const sphereRef = useRef<HTMLElement | null>(null);
     const vrStartScreenRef = useRef<HTMLElement | null>(null);
+    const vrStartBtnRef = useRef<HTMLElement | null>(null);
+    const vrStartTextRef = useRef<HTMLElement | null>(null);
     const questRef = useRef(false);
     const vrVideoStartedRef = useRef(false);
     const vrStartHandlersRef = useRef<{
@@ -406,7 +408,9 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       const v = videoRef.current;
       const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
       const startUi =
-        vrStartScreenRef.current ?? (containerRef.current?.querySelector('#vr-start-screen') as HTMLElement | null);
+        vrStartBtnRef.current ?? (containerRef.current?.querySelector('#vr-start-btn') as HTMLElement | null);
+      const startText =
+        vrStartTextRef.current ?? (containerRef.current?.querySelector('#vr-start-text') as HTMLElement | null);
       if (!scene || !v || !sphere) return;
       if (vrVideoStartedRef.current) return;
       try {
@@ -416,32 +420,33 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       vrVideoStartedRef.current = true;
       try {
         startUi?.setAttribute('visible', 'false');
+        startText?.setAttribute('visible', 'false');
       } catch {}
 
       // KEY: play() invoked from user gesture inside WebXR session.
-      v.muted = false;
-      void v
-        .play()
-        .then(() => {
-          try {
-            sphere.setAttribute('src', '#trainingvideo');
-          } catch {}
-        })
-        .catch(() => {
-          // fallback: start muted, then unmute shortly after
-          try {
-            v.muted = true;
-          } catch {}
-          void v.play().catch(() => {});
-          try {
-            sphere.setAttribute('src', '#trainingvideo');
-          } catch {}
-          window.setTimeout(() => {
+      // Bind sphere BEFORE play; then play after a short delay to allow WebGL texture binding.
+      try {
+        sphere.setAttribute('src', '#trainingvideo');
+      } catch {}
+
+      window.setTimeout(() => {
+        v.muted = false;
+        void v
+          .play()
+          .then(() => {})
+          .catch(() => {
+            // fallback: start muted, then unmute shortly after
             try {
-              v.muted = false;
+              v.muted = true;
             } catch {}
-          }, 900);
-        });
+            void v.play().catch(() => {});
+            window.setTimeout(() => {
+              try {
+                v.muted = false;
+              } catch {}
+            }, 600);
+          });
+      }, 300);
     }, []);
 
     const startVideoSequence = useCallback(async () => {
@@ -686,6 +691,23 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                     animation="property: scale; to: 1.3 1.3 1; dur: 1000; loop: true; dir: alternate; easing: easeInOutSine"
                   ></a-ring>
                 </a-entity>
+                <a-entity
+                  id="vr-start-btn"
+                  class="clickable"
+                  geometry="primitive: plane; width: 1.8; height: 0.6"
+                  material="color: #5B4CFF; shader: flat; opacity: 0.95; side: double"
+                  position="0 0 -2.5"
+                  visible="false"
+                ></a-entity>
+                <a-text
+                  id="vr-start-text"
+                  value="PRESS TRIGGER OR TAP TO START"
+                  color="#FFFFFF"
+                  align="center"
+                  width="2.6"
+                  position="0 0 -2.49"
+                  visible="false"
+                ></a-text>
 
                 <a-entity
                   id="gaze-cursor"
@@ -750,6 +772,8 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         sphereRef.current = container.querySelector('#immersive-sphere') as HTMLElement | null;
         freezeCanvasRef.current = container.querySelector('#freezeCanvas') as HTMLCanvasElement | null;
         vrStartScreenRef.current = container.querySelector('#vr-start-screen') as HTMLElement | null;
+        vrStartBtnRef.current = container.querySelector('#vr-start-btn') as HTMLElement | null;
+        vrStartTextRef.current = container.querySelector('#vr-start-text') as HTMLElement | null;
 
         const finishReady = () => {
           if (cancelled || !containerRef.current) return;
@@ -775,7 +799,9 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
             if (questRef.current) {
               vrVideoStartedRef.current = false;
               try {
-                vrStartScreenRef.current?.setAttribute('visible', 'true');
+                vrStartScreenRef.current?.setAttribute('visible', 'false');
+                vrStartBtnRef.current?.setAttribute('visible', 'true');
+                vrStartTextRef.current?.setAttribute('visible', 'true');
               } catch {}
               try {
                 // Delay binding sphere until play succeeds inside VR.
@@ -783,6 +809,10 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               } catch {}
               try {
                 if (videoRef.current) videoRef.current.muted = true;
+              } catch {}
+              try {
+                // Best-effort: if video was playing from inline start, pause it until VR gesture.
+                if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
               } catch {}
             }
           };
@@ -793,7 +823,8 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
             if (questRef.current) {
               vrVideoStartedRef.current = false;
               try {
-                vrStartScreenRef.current?.setAttribute('visible', 'false');
+                vrStartBtnRef.current?.setAttribute('visible', 'false');
+                vrStartTextRef.current?.setAttribute('visible', 'false');
               } catch {}
               // Restore normal binding on exit.
               try {
@@ -812,6 +843,13 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           sceneElRef.current?.addEventListener('click', handlers.click);
           sceneElRef.current?.addEventListener('triggerdown', handlers.trigger);
           sceneElRef.current?.addEventListener('select', handlers.select);
+
+          // Also attach directly to the VR start button entity so laser clicks work.
+          const btn = vrStartBtnRef.current;
+          if (btn) {
+            btn.addEventListener('click', handlers.click);
+            btn.addEventListener('triggerdown', handlers.trigger);
+          }
 
           // If already in vr-mode, sync.
           try {
