@@ -370,19 +370,27 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         freezeGuardRef.current = null;
       }
 
-      // Seek to just after the question zone, then swap back to live video texture.
-      const onSeeked = () => {
+      // Swap back to live texture and force playback to continue.
+      const swapBack = () => {
         try {
           sphere.setAttribute('src', '#trainingvideo');
         } catch {}
         v.muted = false;
+        void v.play().catch(() => {});
+      };
+
+      // Seek to just after the question zone, then swap back to live video texture.
+      const onSeeked = () => {
+        swapBack();
       };
       v.addEventListener('seeked', onSeeked, { once: true });
       try {
         v.currentTime = target;
       } catch {
-        onSeeked();
+        swapBack();
       }
+      // Quest sometimes fails to fire 'seeked' when seeking while playing; ensure we always swap back.
+      window.setTimeout(() => swapBack(), 300);
     }, []);
 
     const startVideoSequence = useCallback(async () => {
