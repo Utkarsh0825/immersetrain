@@ -13,7 +13,7 @@ import { useQuizEngine } from '@/hooks/useQuizEngine';
 import QuizOverlay from '@/components/train/QuizOverlay';
 import ProgressBar from '@/components/train/ProgressBar';
 import ScoreHUD from '@/components/train/ScoreHUD';
-import type { VideoPlayer360Handle } from '@/components/train/VideoPlayer360';
+import type { VideoPlayer360Handle, VrQuizPayload } from '@/components/train/VideoPlayer360';
 import { enterTrainImmersive, exitTrainImmersive, isAppleMobileWebKit } from '@/lib/trainImmersive';
 
 const VideoPlayer360 = dynamic(() => import('@/components/train/VideoPlayer360'), {
@@ -47,6 +47,8 @@ export default function TrainPage() {
   });
   const [appleMobile, setAppleMobile] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [inVr, setInVr] = useState(false);
+  const vrShownForQuestionId = useRef<string>('');
 
   const playerRef = useRef<VideoPlayer360Handle>(null);
   const trainShellRef = useRef<HTMLDivElement>(null);
@@ -160,6 +162,41 @@ export default function TrainPage() {
     }
   }, [quiz.quizState]);
 
+  // When in WebXR VR mode, show questions inside the A-Frame scene (camera-attached HUD).
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    if (!inVr) {
+      vrShownForQuestionId.current = '';
+      player.hideVrQuiz();
+      return;
+    }
+
+    const shouldShow = quiz.quizState === 'paused_for_question' && !!quiz.currentQuestion;
+    if (!shouldShow) {
+      player.hideVrQuiz();
+      return;
+    }
+
+    const q = quiz.currentQuestion!;
+    if (vrShownForQuestionId.current === q.id) return;
+    vrShownForQuestionId.current = q.id;
+
+    const payload: VrQuizPayload = {
+      id: q.id,
+      questionIndex: quiz.answeredCount,
+      totalQuestions: quiz.totalQuestions,
+      questionText: q.question_text ?? '',
+      optionA: q.option_a ?? '',
+      optionB: q.option_b ?? '',
+      correctOption: (q.correct_option ?? 'a') as 'a' | 'b',
+      explanation: q.explanation ?? '',
+      points: q.points ?? 10,
+    };
+    player.showVrQuiz(payload);
+  }, [inVr, quiz.quizState, quiz.currentQuestion, quiz.answeredCount, quiz.totalQuestions]);
+
   const maxScore = (scenario?.questions.length ?? 10) * 10;
 
   useEffect(() => {
@@ -265,6 +302,12 @@ export default function TrainPage() {
         videoUrl={scenario?.video_url ?? DEMO_SCENARIO.video_url}
         fullscreenRootRef={trainShellRef}
         fullscreenOnStart
+        onVrModeChange={(v) => setInVr(v)}
+        onVrQuizAnswer={({ questionId, chosenOption }) => {
+          // Guard: only accept answers for the currently shown question.
+          if (quiz.currentQuestion?.id !== questionId) return;
+          quiz.submitAnswer(chosenOption);
+        }}
         onReady={() => {
           setPlayerReady(true);
         }}
@@ -272,7 +315,8 @@ export default function TrainPage() {
 
       {/* ── Quiz overlay ── */}
       <AnimatePresence>
-        {(quiz.quizState === 'paused_for_question' || quiz.quizState === 'showing_feedback') &&
+        {!inVr &&
+          (quiz.quizState === 'paused_for_question' || quiz.quizState === 'showing_feedback') &&
           quiz.currentQuestion && (
             <QuizOverlay
               key={quiz.currentQuestion.id}

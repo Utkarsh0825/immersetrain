@@ -11,7 +11,22 @@ export interface VideoPlayer360Handle {
   seek: (timeSeconds: number) => void;
   onTimeUpdate: (cb: (time: number) => void) => () => void;
   enterVR: () => void;
+  setVrQuizVisible: (visible: boolean) => void;
+  showVrQuiz: (payload: VrQuizPayload) => void;
+  hideVrQuiz: () => void;
 }
+
+export type VrQuizPayload = {
+  id: string;
+  questionIndex: number;
+  totalQuestions: number;
+  questionText: string;
+  optionA: string;
+  optionB: string;
+  correctOption: 'a' | 'b';
+  explanation?: string;
+  points?: number;
+};
 
 interface VideoPlayer360Props {
   videoUrl: string;
@@ -20,6 +35,10 @@ interface VideoPlayer360Props {
   fullscreenRootRef?: React.RefObject<HTMLElement | null>;
   /** When true with fullscreenRootRef, enter fullscreen immediately on user start tap. */
   fullscreenOnStart?: boolean;
+  /** Called when user answers inside VR quiz panel. */
+  onVrQuizAnswer?: (args: { questionId: string; chosenOption: 'a' | 'b' }) => void;
+  /** Notifies parent when WebXR immersive mode toggles. */
+  onVrModeChange?: (inVr: boolean) => void;
 }
 
 declare global {
@@ -125,7 +144,7 @@ async function waitForVideoInContainer(
 }
 
 const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
-  ({ videoUrl, onReady, fullscreenRootRef, fullscreenOnStart }, ref) => {
+  ({ videoUrl, onReady, fullscreenRootRef, fullscreenOnStart, onVrQuizAnswer, onVrModeChange }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const sceneElRef = useRef<ASceneEl | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -138,6 +157,126 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     const [videoBuffering, setVideoBuffering] = useState(false);
     const startInProgress = useRef(false);
     const aliveRef = useRef(true);
+    const [inVr, setInVr] = useState(false);
+    const vrElsRef = useRef<{
+      panel?: HTMLElement | null;
+      cursor?: HTMLElement | null;
+      label?: HTMLElement | null;
+      points?: HTMLElement | null;
+      q?: HTMLElement | null;
+      aBtn?: HTMLElement | null;
+      bBtn?: HTMLElement | null;
+      aBg?: HTMLElement | null;
+      bBg?: HTMLElement | null;
+      aText?: HTMLElement | null;
+      bText?: HTMLElement | null;
+      feedback?: HTMLElement | null;
+    }>({});
+
+    const vrHandlersRef = useRef<{
+      a?: ((e: Event) => void) | null;
+      b?: ((e: Event) => void) | null;
+      aEnter?: ((e: Event) => void) | null;
+      aLeave?: ((e: Event) => void) | null;
+      bEnter?: ((e: Event) => void) | null;
+      bLeave?: ((e: Event) => void) | null;
+    }>({});
+
+    const setVrQuizVisible = useCallback((visible: boolean) => {
+      const els = vrElsRef.current;
+      els.panel?.setAttribute('visible', visible ? 'true' : 'false');
+      els.cursor?.setAttribute('visible', visible ? 'true' : 'false');
+      if (!visible) {
+        els.feedback?.setAttribute('visible', 'false');
+        els.feedback?.setAttribute('value', '');
+      }
+    }, []);
+
+    const hideVrQuiz = useCallback(() => {
+      setVrQuizVisible(false);
+    }, [setVrQuizVisible]);
+
+    const showVrQuiz = useCallback(
+      (payload: VrQuizPayload) => {
+        const els = vrElsRef.current;
+        if (!els.panel) return;
+
+        // Text
+        els.label?.setAttribute(
+          'value',
+          `QUESTION ${Math.min(payload.questionIndex + 1, payload.totalQuestions)} OF ${payload.totalQuestions}`
+        );
+        els.points?.setAttribute('value', `+ ${payload.points ?? 10} pts`);
+        els.q?.setAttribute('value', payload.questionText ?? '');
+        els.aText?.setAttribute('value', payload.optionA ?? '');
+        els.bText?.setAttribute('value', payload.optionB ?? '');
+
+        // Reset visuals
+        els.aBg?.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98');
+        els.bBg?.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98');
+        els.feedback?.setAttribute('visible', 'false');
+        els.feedback?.setAttribute('value', '');
+        els.cursor?.setAttribute('visible', 'true');
+
+        // Remove prior listeners
+        const h = vrHandlersRef.current;
+        if (els.aBtn && h.a) els.aBtn.removeEventListener('click', h.a);
+        if (els.bBtn && h.b) els.bBtn.removeEventListener('click', h.b);
+        if (els.aBtn && h.aEnter) els.aBtn.removeEventListener('mouseenter', h.aEnter);
+        if (els.aBtn && h.aLeave) els.aBtn.removeEventListener('mouseleave', h.aLeave);
+        if (els.bBtn && h.bEnter) els.bBtn.removeEventListener('mouseenter', h.bEnter);
+        if (els.bBtn && h.bLeave) els.bBtn.removeEventListener('mouseleave', h.bLeave);
+
+        const hoverOnA = () => els.aBg?.setAttribute('material', 'color: #2a2a4e; shader: flat; opacity: 0.98');
+        const hoverOffA = () => els.aBg?.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98');
+        const hoverOnB = () => els.bBg?.setAttribute('material', 'color: #2a2a4e; shader: flat; opacity: 0.98');
+        const hoverOffB = () => els.bBg?.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98');
+
+        const answer = (chosen: 'a' | 'b') => {
+          const correct = payload.correctOption;
+          const isCorrect = chosen === correct;
+          const chosenBg = chosen === 'a' ? els.aBg : els.bBg;
+          const correctBg = correct === 'a' ? els.aBg : els.bBg;
+
+          if (isCorrect) {
+            chosenBg?.setAttribute('material', 'color: #166534; shader: flat; opacity: 0.98');
+            els.feedback?.setAttribute('value', `✓ Correct! +${payload.points ?? 10}`);
+            els.feedback?.setAttribute('color', '#22c55e');
+          } else {
+            chosenBg?.setAttribute('material', 'color: #7f1d1d; shader: flat; opacity: 0.98');
+            correctBg?.setAttribute('material', 'color: #166534; shader: flat; opacity: 0.98');
+            const msg = (payload.explanation ?? '✗ Incorrect').slice(0, 110);
+            els.feedback?.setAttribute('value', msg);
+            els.feedback?.setAttribute('color', '#ef4444');
+          }
+          els.feedback?.setAttribute('visible', 'true');
+          els.cursor?.setAttribute('visible', 'false');
+
+          // Dispatch to React quiz engine, then hide after a beat.
+          window.setTimeout(() => {
+            onVrQuizAnswer?.({ questionId: payload.id, chosenOption: chosen });
+            hideVrQuiz();
+          }, 900);
+        };
+
+        h.aEnter = hoverOnA;
+        h.aLeave = hoverOffA;
+        h.bEnter = hoverOnB;
+        h.bLeave = hoverOffB;
+        h.a = () => answer('a');
+        h.b = () => answer('b');
+
+        els.aBtn?.addEventListener('mouseenter', h.aEnter);
+        els.aBtn?.addEventListener('mouseleave', h.aLeave);
+        els.bBtn?.addEventListener('mouseenter', h.bEnter);
+        els.bBtn?.addEventListener('mouseleave', h.bLeave);
+        els.aBtn?.addEventListener('click', h.a);
+        els.bBtn?.addEventListener('click', h.b);
+
+        setVrQuizVisible(true);
+      },
+      [hideVrQuiz, onVrQuizAnswer, setVrQuizVisible]
+    );
 
     const attachVideoListeners = useCallback((videoEl: HTMLVideoElement, resolvedSrc: string) => {
       resolvedSrcRef.current = resolvedSrc;
@@ -235,16 +374,14 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         return () => timeCallbacks.current.delete(cb);
       },
       enterVR: () => {
-        // Quest WebXR immersive mode hides DOM overlays, so React quiz UI won't render there.
-        // Keep the experience in “inline 360” where questions work.
-        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-        const isQuest = /OculusBrowser|Quest/i.test(ua);
-        if (isQuest) return;
         const scene =
           sceneElRef.current ??
           (containerRef.current?.querySelector('a-scene') as ASceneEl | null);
         scene?.enterVR?.();
       },
+      setVrQuizVisible,
+      showVrQuiz,
+      hideVrQuiz,
     }));
 
     const handleStartClick = useCallback(() => {
@@ -284,12 +421,8 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         resolvedSrcRef.current = resolvedSrc;
 
         /* src set in JS so query strings / encoding never break the inline scene HTML */
-        const ua = window.navigator.userAgent ?? '';
-        const isQuest = /OculusBrowser|Quest/i.test(ua);
-        // Do not use A-Frame's VR/fullscreen button for quiz experiences.
-        // We fullscreen the training shell (DOM + canvas together) so questions remain visible.
-        // Quest immersive WebXR also hides DOM overlays, so keep VR UI disabled there too.
-        const stereoUi = 'false';
+        // VR button can be enabled again: quizzes render inside the scene for WebXR.
+        const stereoUi = 'true';
         container.innerHTML = `
           <a-scene
             embedded
@@ -315,15 +448,57 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               rotation="0 -90 0"
               visible="true"
             ></a-videosphere>
-            <a-camera>
-              <a-cursor
-                color="#0066FF"
-                fuse="true"
-                fuse-timeout="1500"
-                animation__mouseenter="property: scale; startEvents: mouseenter; easing: easeInCubic; dur: 150; to: 1.3 1.3 1.3"
-                animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCubic; dur: 150; to: 1 1 1"
-              ></a-cursor>
-            </a-camera>
+            <a-entity id="camera-rig" position="0 1.6 0">
+              <a-camera id="main-camera" look-controls="pointerLockEnabled: false" wasd-controls="enabled: false">
+                <a-entity
+                  id="gaze-cursor"
+                  cursor="fuse: true; fuseTimeout: 1500"
+                  position="0 0 -1"
+                  geometry="primitive: ring; radiusInner: 0.014; radiusOuter: 0.02"
+                  material="color: #FFFFFF; shader: flat; opacity: 0.85"
+                  animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.5 0.5 0.5; dur: 1500; easing: easeInCubic"
+                  animation__fusend="property: scale; startEvents: mouseleave; from: 0.5 0.5 0.5; to: 1 1 1; dur: 150"
+                  raycaster="objects: .clickable; far: 8"
+                  visible="false"
+                ></a-entity>
+
+                <a-entity id="quiz-panel" position="0 -0.25 -1.8" visible="false">
+                  <a-plane
+                    id="quiz-bg"
+                    width="1.42"
+                    height="0.88"
+                    material="color: #0d0d18; shader: flat; opacity: 0.95; side: double"
+                  ></a-plane>
+                  <a-plane
+                    width="1.42"
+                    height="0.04"
+                    position="0 0.42 0.001"
+                    material="color: #5B4CFF; shader: flat; opacity: 1; side: double"
+                  ></a-plane>
+
+                  <a-text id="quiz-label" value="QUESTION 1 OF 10" color="#5B4CFF" align="left" anchor="left" width="1.25" position="-0.69 0.33 0.002"></a-text>
+                  <a-text id="quiz-points" value="+ 10 pts" color="#00D4FF" align="right" anchor="right" width="1.0" position="0.69 0.33 0.002"></a-text>
+                  <a-text id="quiz-question" value="Loading question..." color="#FFFFFF" align="left" anchor="left" width="1.25" wrap-count="40" position="-0.69 0.15 0.002"></a-text>
+
+                  <a-entity id="option-a-btn" class="clickable" position="0 -0.12 0.002">
+                    <a-plane id="option-a-bg" width="1.34" height="0.17" material="color: #1a1a2e; shader: flat; opacity: 0.98; side: double"></a-plane>
+                    <a-text id="option-a-label" value="A" color="#5B4CFF" align="left" anchor="left" width="0.3" position="-0.62 0 0.001"></a-text>
+                    <a-text id="option-a-text" value="Option A" color="#FFFFFF" align="left" anchor="left" width="1.1" wrap-count="38" position="-0.52 0 0.001"></a-text>
+                  </a-entity>
+
+                  <a-entity id="option-b-btn" class="clickable" position="0 -0.33 0.002">
+                    <a-plane id="option-b-bg" width="1.34" height="0.17" material="color: #1a1a2e; shader: flat; opacity: 0.98; side: double"></a-plane>
+                    <a-text id="option-b-label" value="B" color="#5B4CFF" align="left" anchor="left" width="0.3" position="-0.62 0 0.001"></a-text>
+                    <a-text id="option-b-text" value="Option B" color="#FFFFFF" align="left" anchor="left" width="1.1" wrap-count="38" position="-0.52 0 0.001"></a-text>
+                  </a-entity>
+
+                  <a-text id="quiz-feedback" value="" color="#22c55e" align="center" width="1.25" wrap-count="44" position="0 -0.55 0.002" visible="false"></a-text>
+                </a-entity>
+              </a-camera>
+            </a-entity>
+
+            <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 10"></a-entity>
+            <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 10"></a-entity>
           </a-scene>
         `;
 
@@ -349,8 +524,55 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           window.setTimeout(finishReady, 0);
           return;
         }
-        if (scene.hasLoaded) finishReady();
-        else scene.addEventListener('loaded', finishReady, { once: true });
+        const wireVr = () => {
+          if (!sceneElRef.current) return;
+          const s = sceneElRef.current as any;
+          const enter = () => {
+            setInVr(true);
+            onVrModeChange?.(true);
+          };
+          const exit = () => {
+            setInVr(false);
+            onVrModeChange?.(false);
+            hideVrQuiz();
+          };
+          sceneElRef.current?.addEventListener('enter-vr', enter);
+          sceneElRef.current?.addEventListener('exit-vr', exit);
+          // If already in vr-mode, sync.
+          try {
+            if (typeof s?.is === 'function' && s.is('vr-mode')) {
+              enter();
+            }
+          } catch {}
+        };
+
+        const cacheVrEls = () => {
+          const root = containerRef.current;
+          if (!root) return;
+          vrElsRef.current = {
+            panel: root.querySelector('#quiz-panel') as HTMLElement | null,
+            cursor: root.querySelector('#gaze-cursor') as HTMLElement | null,
+            label: root.querySelector('#quiz-label') as HTMLElement | null,
+            points: root.querySelector('#quiz-points') as HTMLElement | null,
+            q: root.querySelector('#quiz-question') as HTMLElement | null,
+            aBtn: root.querySelector('#option-a-btn') as HTMLElement | null,
+            bBtn: root.querySelector('#option-b-btn') as HTMLElement | null,
+            aBg: root.querySelector('#option-a-bg') as HTMLElement | null,
+            bBg: root.querySelector('#option-b-bg') as HTMLElement | null,
+            aText: root.querySelector('#option-a-text') as HTMLElement | null,
+            bText: root.querySelector('#option-b-text') as HTMLElement | null,
+            feedback: root.querySelector('#quiz-feedback') as HTMLElement | null,
+          };
+        };
+
+        const readyAll = () => {
+          finishReady();
+          cacheVrEls();
+          wireVr();
+        };
+
+        if (scene.hasLoaded) readyAll();
+        else scene.addEventListener('loaded', readyAll, { once: true });
       };
 
       void mount();
@@ -364,7 +586,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           containerRef.current.innerHTML = '';
         }
       };
-    }, [videoUrl, attachVideoListeners, fullscreenOnStart]);
+    }, [videoUrl, attachVideoListeners, fullscreenOnStart, hideVrQuiz, onVrModeChange]);
 
     const showOverlay = overlayState !== 'gone';
 
