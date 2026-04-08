@@ -14,6 +14,8 @@ export interface VideoPlayer360Handle {
   setVrQuizVisible: (visible: boolean) => void;
   showVrQuiz: (payload: VrQuizPayload) => void;
   hideVrQuiz: () => void;
+  freezeFrame: () => void;
+  resumeFromFreeze: (skipSeconds?: number) => void;
 }
 
 export type VrQuizPayload = {
@@ -161,6 +163,11 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     const lastPausedTimeRef = useRef<number>(0);
     const lastKnownTimeRef = useRef<number>(0);
     const timeGuardRef = useRef<number | null>(null);
+    const freezeGuardRef = useRef<number | null>(null);
+    const frozenAtRef = useRef<number>(0);
+    const inFreezeRef = useRef<boolean>(false);
+    const freezeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const sphereRef = useRef<HTMLElement | null>(null);
     const vrElsRef = useRef<{
       panel?: HTMLElement | null;
       cursor?: HTMLElement | null;
@@ -306,6 +313,78 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       });
     }, []);
 
+    const freezeFrame = useCallback(() => {
+      const v = videoRef.current;
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
+      const canvas =
+        freezeCanvasRef.current ??
+        (containerRef.current?.querySelector('#freezeCanvas') as HTMLCanvasElement | null);
+      if (!v || !sphere || !canvas) return;
+
+      freezeCanvasRef.current = canvas;
+      sphereRef.current = sphere;
+
+      const t = v.currentTime || lastKnownTimeRef.current;
+      frozenAtRef.current = t;
+      inFreezeRef.current = true;
+
+      try {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      } catch {}
+
+      // Swap videosphere to frozen canvas texture (no pause/play = no Quest decode reset).
+      try {
+        sphere.setAttribute('src', '#freezeCanvas');
+      } catch {}
+
+      // Mute while question is shown (video continues in background).
+      v.muted = true;
+
+      // Keep the underlying media time pinned close to the frozen moment (avoid drifting ahead).
+      if (freezeGuardRef.current != null) window.clearInterval(freezeGuardRef.current);
+      freezeGuardRef.current = window.setInterval(() => {
+        const vv = videoRef.current;
+        if (!vv) return;
+        if (!inFreezeRef.current) return;
+        const target = frozenAtRef.current;
+        try {
+          if (Number.isFinite(target) && target > 0.05 && Math.abs(vv.currentTime - target) > 0.35) {
+            vv.currentTime = target;
+          }
+        } catch {}
+      }, 200);
+    }, []);
+
+    const resumeFromFreeze = useCallback((skipSeconds: number = 0.6) => {
+      const v = videoRef.current;
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
+      if (!v || !sphere) return;
+
+      const target = Math.max(0, (frozenAtRef.current || v.currentTime || lastKnownTimeRef.current) + skipSeconds);
+      inFreezeRef.current = false;
+
+      if (freezeGuardRef.current != null) {
+        window.clearInterval(freezeGuardRef.current);
+        freezeGuardRef.current = null;
+      }
+
+      // Seek to just after the question zone, then swap back to live video texture.
+      const onSeeked = () => {
+        try {
+          sphere.setAttribute('src', '#trainingvideo');
+        } catch {}
+        v.muted = false;
+      };
+      v.addEventListener('seeked', onSeeked, { once: true });
+      try {
+        v.currentTime = target;
+      } catch {
+        onSeeked();
+      }
+    }, []);
+
     const startVideoSequence = useCallback(async () => {
       if (startInProgress.current) return;
       startInProgress.current = true;
@@ -436,6 +515,8 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       setVrQuizVisible,
       showVrQuiz,
       hideVrQuiz,
+      freezeFrame,
+      resumeFromFreeze,
     }));
 
     const handleStartClick = useCallback(() => {
@@ -504,6 +585,9 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               preload="auto"
               style="display:none;width:2px;height:2px;position:absolute;left:-9999px"
             ></video>
+            <a-assets>
+              <canvas id="freezeCanvas" width="1280" height="640"></canvas>
+            </a-assets>
             <a-videosphere
               id="immersive-sphere"
               src="#trainingvideo"
@@ -572,6 +656,8 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
         const scene = container.querySelector('a-scene') as ASceneEl | null;
         sceneElRef.current = scene;
+        sphereRef.current = container.querySelector('#immersive-sphere') as HTMLElement | null;
+        freezeCanvasRef.current = container.querySelector('#freezeCanvas') as HTMLCanvasElement | null;
 
         const finishReady = () => {
           if (cancelled || !containerRef.current) return;

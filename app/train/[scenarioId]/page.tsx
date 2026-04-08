@@ -148,7 +148,9 @@ export default function TrainPage() {
       const shouldPause = quiz.checkTimestamp(time);
       if (shouldPause && !isPausedRef.current) {
         isPausedRef.current = true;
-        playerRef.current?.pause();
+        // Quest/WebXR: don't pause the video element (it can reset decode to frame 0).
+        // Instead, freeze the videosphere to a canvas frame.
+        playerRef.current?.freezeFrame();
       }
     });
     return () => cleanupTimeUpdate.current?.();
@@ -158,7 +160,7 @@ export default function TrainPage() {
   useEffect(() => {
     if (quiz.quizState === 'playing' && isPausedRef.current) {
       isPausedRef.current = false;
-      setTimeout(() => playerRef.current?.play(), 400);
+      setTimeout(() => playerRef.current?.resumeFromFreeze(0.6), 60);
     }
   }, [quiz.quizState]);
 
