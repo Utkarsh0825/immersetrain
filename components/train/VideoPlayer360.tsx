@@ -353,7 +353,19 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       play: () => {
         const v = videoRef.current;
         if (!v) return;
-        void playWithRetries(v, false).catch(() => v.play().catch(() => {}));
+        // IMPORTANT: resume should never "re-init" playback. In some browsers/Quest,
+        // toggling muted + retry loops can look like a restart. Preserve currentTime.
+        const t = v.currentTime;
+        void v.play()
+          .catch(() => {})
+          .finally(() => {
+            // If the browser reset playback, snap back to where we paused.
+            try {
+              if (Number.isFinite(t) && t > 0.05 && v.currentTime < Math.max(0, t - 0.15)) {
+                v.currentTime = t;
+              }
+            } catch {}
+          });
       },
       pause: () => {
         videoRef.current?.pause();
