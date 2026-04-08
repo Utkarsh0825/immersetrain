@@ -158,6 +158,8 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     const startInProgress = useRef(false);
     const aliveRef = useRef(true);
     const [inVr, setInVr] = useState(false);
+    const lastPausedTimeRef = useRef<number>(0);
+    const lastKnownTimeRef = useRef<number>(0);
     const vrElsRef = useRef<{
       panel?: HTMLElement | null;
       cursor?: HTMLElement | null;
@@ -298,6 +300,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
       videoEl.addEventListener('error', onError);
       videoEl.addEventListener('timeupdate', () => {
+        lastKnownTimeRef.current = videoEl.currentTime;
         timeCallbacks.current.forEach((cb) => cb(videoEl.currentTime));
       });
     }, []);
@@ -355,7 +358,13 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         if (!v) return;
         // IMPORTANT: resume should never "re-init" playback. In some browsers/Quest,
         // toggling muted + retry loops can look like a restart. Preserve currentTime.
-        const t = v.currentTime;
+        const t = v.currentTime || lastPausedTimeRef.current || lastKnownTimeRef.current;
+        // If something snapped to 0 while paused, restore immediately before play.
+        try {
+          if (Number.isFinite(t) && t > 0.05 && v.currentTime < Math.max(0, t - 0.15)) {
+            v.currentTime = t;
+          }
+        } catch {}
         void v.play()
           .catch(() => {})
           .finally(() => {
@@ -368,7 +377,21 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           });
       },
       pause: () => {
-        videoRef.current?.pause();
+        const v = videoRef.current;
+        if (!v) return;
+        const saved = v.currentTime || lastKnownTimeRef.current;
+        lastPausedTimeRef.current = saved;
+        v.pause();
+        // Safety check: some WebXR implementations briefly snap currentTime.
+        window.setTimeout(() => {
+          const vv = videoRef.current;
+          if (!vv) return;
+          try {
+            if (Number.isFinite(saved) && saved > 0.05 && vv.currentTime < Math.max(0, saved - 0.6)) {
+              vv.currentTime = saved;
+            }
+          } catch {}
+        }, 120);
       },
       getCurrentTime: () => videoRef.current?.currentTime ?? 0,
       getDuration: () => videoRef.current?.duration ?? 0,
@@ -449,7 +472,6 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               playsinline
               webkit-playsinline
               crossorigin="anonymous"
-              loop="false"
               preload="auto"
               style="display:none;width:2px;height:2px;position:absolute;left:-9999px"
             ></video>
