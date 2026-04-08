@@ -160,6 +160,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     const [inVr, setInVr] = useState(false);
     const lastPausedTimeRef = useRef<number>(0);
     const lastKnownTimeRef = useRef<number>(0);
+    const timeGuardRef = useRef<number | null>(null);
     const vrElsRef = useRef<{
       panel?: HTMLElement | null;
       cursor?: HTMLElement | null;
@@ -356,6 +357,10 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       play: () => {
         const v = videoRef.current;
         if (!v) return;
+        if (timeGuardRef.current != null) {
+          window.clearInterval(timeGuardRef.current);
+          timeGuardRef.current = null;
+        }
         // IMPORTANT: resume should never "re-init" playback. In some browsers/Quest,
         // toggling muted + retry loops can look like a restart. Preserve currentTime.
         const t = v.currentTime || lastPausedTimeRef.current || lastKnownTimeRef.current;
@@ -375,6 +380,16 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               }
             } catch {}
           });
+        // Some runtimes reset currentTime slightly after play() resolves.
+        window.setTimeout(() => {
+          const vv = videoRef.current;
+          if (!vv) return;
+          try {
+            if (Number.isFinite(t) && t > 0.05 && vv.currentTime < Math.max(0, t - 0.25)) {
+              vv.currentTime = t;
+            }
+          } catch {}
+        }, 260);
       },
       pause: () => {
         const v = videoRef.current;
@@ -382,8 +397,13 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         const saved = v.currentTime || lastKnownTimeRef.current;
         lastPausedTimeRef.current = saved;
         v.pause();
-        // Safety check: some WebXR implementations briefly snap currentTime.
-        window.setTimeout(() => {
+        // Quest/WebXR can snap the video element back to 0 while paused.
+        // Guard continuously until we resume.
+        if (timeGuardRef.current != null) {
+          window.clearInterval(timeGuardRef.current);
+          timeGuardRef.current = null;
+        }
+        timeGuardRef.current = window.setInterval(() => {
           const vv = videoRef.current;
           if (!vv) return;
           try {
@@ -391,7 +411,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               vv.currentTime = saved;
             }
           } catch {}
-        }, 120);
+        }, 140);
       },
       getCurrentTime: () => videoRef.current?.currentTime ?? 0,
       getDuration: () => videoRef.current?.duration ?? 0,
@@ -431,6 +451,15 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         void startVideoSequence();
       }, 280);
     }, [overlayState, startVideoSequence, fullscreenOnStart, fullscreenRootRef]);
+
+    useEffect(() => {
+      return () => {
+        if (timeGuardRef.current != null) {
+          window.clearInterval(timeGuardRef.current);
+          timeGuardRef.current = null;
+        }
+      };
+    }, []);
 
     useEffect(() => {
       if (typeof window === 'undefined') return;
