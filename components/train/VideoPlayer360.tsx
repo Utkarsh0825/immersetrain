@@ -325,7 +325,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
     const freezeFrame = useCallback(() => {
       const v = videoRef.current;
-      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#videosphere') as any | null);
       const canvas =
         freezeCanvasRef.current ??
         (containerRef.current?.querySelector('#freezeCanvas') as HTMLCanvasElement | null);
@@ -344,9 +344,9 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
       } catch {}
 
-      // Swap videosphere to frozen canvas texture (no pause/play = no Quest decode reset).
+      // Swap sphere to frozen canvas texture (no pause/play = no Quest decode reset).
       try {
-        sphere.setAttribute('src', '#freezeCanvas');
+        sphere.setAttribute('material', 'src: #freezeCanvas; side: back; shader: flat;');
       } catch {}
 
       // Mute while question is shown (video continues in background).
@@ -369,7 +369,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
     const resumeFromFreeze = useCallback((skipSeconds: number = 0.6) => {
       const v = videoRef.current;
-      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#videosphere') as any | null);
       if (!v || !sphere) return;
 
       const target = Math.max(0, (frozenAtRef.current || v.currentTime || lastKnownTimeRef.current) + skipSeconds);
@@ -383,7 +383,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       // Swap back to live texture and force playback to continue.
       const swapBack = () => {
         try {
-          sphere.setAttribute('src', '#trainingvideo');
+          sphere.setAttribute('material', 'src: #trainingvideo; side: back; shader: flat;');
         } catch {}
         v.muted = false;
         void v.play().catch(() => {});
@@ -406,7 +406,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     const startVrVideoFromGesture = useCallback(() => {
       const scene = sceneElRef.current as any;
       const v = videoRef.current;
-      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#videosphere') as any | null);
       const startUi =
         vrStartBtnRef.current ?? (containerRef.current?.querySelector('#vr-start-btn') as HTMLElement | null);
       const startText =
@@ -426,7 +426,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       // KEY: play() invoked from user gesture inside WebXR session.
       // Bind sphere BEFORE play; then play after a short delay to allow WebGL texture binding.
       try {
-        sphere.setAttribute('src', '#trainingvideo');
+        sphere.setAttribute('material', 'src: #trainingvideo; side: back; shader: flat;');
       } catch {}
 
       window.setTimeout(() => {
@@ -653,12 +653,15 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
             <a-assets>
               <canvas id="freezeCanvas" width="1280" height="640"></canvas>
             </a-assets>
-            <a-videosphere
-              id="immersive-sphere"
-              src="#trainingvideo"
+            <a-sphere
+              id="videosphere"
+              radius="100"
+              position="0 0 0"
               rotation="0 -90 0"
-              visible="true"
-            ></a-videosphere>
+              material="src: #trainingvideo; side: back; shader: flat;"
+              segments-height="32"
+              segments-width="32"
+            ></a-sphere>
             <a-entity id="camera-rig" position="0 1.6 0">
               <a-camera id="main-camera" look-controls="pointerLockEnabled: false" wasd-controls="enabled: false">
                 <a-entity id="vr-start-screen" visible="false">
@@ -769,7 +772,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
         const scene = container.querySelector('a-scene') as ASceneEl | null;
         sceneElRef.current = scene;
-        sphereRef.current = container.querySelector('#immersive-sphere') as HTMLElement | null;
+        sphereRef.current = container.querySelector('#videosphere') as any | null;
         freezeCanvasRef.current = container.querySelector('#freezeCanvas') as HTMLCanvasElement | null;
         vrStartScreenRef.current = container.querySelector('#vr-start-screen') as HTMLElement | null;
         vrStartBtnRef.current = container.querySelector('#vr-start-btn') as HTMLElement | null;
@@ -791,6 +794,23 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         const wireVr = () => {
           if (!sceneElRef.current) return;
           const s = sceneElRef.current as any;
+
+          const forceTextureUpdate = () => {
+            const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#videosphere') as any | null);
+            if (!sphere) return;
+            try {
+              const mat = sphere?.components?.material?.material;
+              if (mat?.map) mat.map.needsUpdate = true;
+              if (mat) mat.needsUpdate = true;
+            } catch {}
+            try {
+              const mesh = sphere.getObject3D?.('mesh');
+              const m = mesh?.material;
+              if (m?.map) m.map.needsUpdate = true;
+              if (m) m.needsUpdate = true;
+            } catch {}
+          };
+
           const enter = () => {
             setInVr(true);
             onVrModeChange?.(true);
@@ -805,7 +825,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               } catch {}
               try {
                 // Delay binding sphere until play succeeds inside VR.
-                sphereRef.current?.setAttribute('src', '');
+                sphereRef.current?.setAttribute('material', 'src: ; side: back; shader: flat;');
               } catch {}
               try {
                 if (videoRef.current) videoRef.current.muted = true;
@@ -815,6 +835,16 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
               } catch {}
             }
+
+            // Force texture update burst on enter-vr (Quest WebXR black texture mitigation).
+            forceTextureUpdate();
+            window.setTimeout(forceTextureUpdate, 500);
+            let count = 0;
+            const interval = window.setInterval(() => {
+              forceTextureUpdate();
+              count++;
+              if (count > 30) window.clearInterval(interval);
+            }, 100);
           };
           const exit = () => {
             setInVr(false);
@@ -828,7 +858,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               } catch {}
               // Restore normal binding on exit.
               try {
-                sphereRef.current?.setAttribute('src', '#trainingvideo');
+                sphereRef.current?.setAttribute('material', 'src: #trainingvideo; side: back; shader: flat;');
               } catch {}
             }
           };
