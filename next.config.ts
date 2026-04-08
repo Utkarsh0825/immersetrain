@@ -16,15 +16,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Avoid stale broken MP4 in browser cache; keep CORS for WebGL textures
-        source: '/videos/:path*',
-        headers: [
-          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Accept-Ranges', value: 'bytes' },
-        ],
-      },
-      {
         source: '/train/(.*)',
         headers: [
           { key: 'Cross-Origin-Embedder-Policy', value: 'unsafe-none' },
