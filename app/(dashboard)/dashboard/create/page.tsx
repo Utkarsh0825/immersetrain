@@ -417,7 +417,7 @@ export default function ScenarioBuilderPage() {
             ← Dashboard
           </Link>
           <input
-            value={title}
+            value={title ?? ''}
             onChange={(e) => setTitle(e.target.value)}
             style={{
               fontFamily: 'var(--font-clash)',
@@ -548,7 +548,7 @@ export default function ScenarioBuilderPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <input
                       className="input-dark"
-                      value={urlDraft}
+                      value={urlDraft ?? ''}
                       onChange={(e) => setUrlDraft(e.target.value)}
                       placeholder="Paste a direct video URL (MP4/MOV/WebM)"
                     />
@@ -632,7 +632,7 @@ export default function ScenarioBuilderPage() {
                           type="range"
                           min={0}
                           max={Math.max(1, Math.floor(duration || 1))}
-                          value={Math.floor(currentTime)}
+                          value={Math.floor(currentTime || 0)}
                           onChange={(e) => {
                             const next = Number(e.target.value);
                             playerRef.current?.seek(next);
@@ -678,19 +678,19 @@ export default function ScenarioBuilderPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
               <input
                 className="input-dark"
-                value={title}
+                value={title ?? ''}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Give your scenario a title…"
               />
               <textarea
                 className="input-dark"
-                value={description}
+                value={description ?? ''}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Description"
                 rows={3}
                 style={{ resize: 'vertical' }}
               />
-              <input className="input-dark" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry (e.g. Transit & Rail)" />
+              <input className="input-dark" value={industry ?? ''} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry (e.g. Transit & Rail)" />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {tags.map((tg) => (
                   <button
@@ -716,7 +716,7 @@ export default function ScenarioBuilderPage() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   className="input-dark"
-                  value={tagDraft}
+                  value={tagDraft ?? ''}
                   onChange={(e) => setTagDraft(e.target.value)}
                   placeholder="Add tag and press Enter"
                   onKeyDown={(e) => {
@@ -730,7 +730,7 @@ export default function ScenarioBuilderPage() {
                   }}
                 />
                 <select
-                  value={status}
+                  value={status ?? 'draft'}
                   onChange={(e) => setStatus(e.target.value as any)}
                   className="input-dark"
                   style={{ maxWidth: 160 }}
@@ -793,7 +793,7 @@ export default function ScenarioBuilderPage() {
                               <input
                                 className="input-dark"
                                 type="number"
-                                value={q.timestamp_seconds}
+                                value={q.timestamp_seconds ?? 0}
                                 onChange={(e) => {
                                   const v = Math.max(0, Math.floor(Number(e.target.value || 0)));
                                   setQuestions((p) => p.map((x) => (x.id === q.id ? { ...x, timestamp_seconds: v } : x)));
@@ -815,20 +815,20 @@ export default function ScenarioBuilderPage() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, marginTop: 12 }}>
                               <textarea
                                 className="input-dark"
-                                value={q.question_text}
+                                value={q.question_text ?? ''}
                                 onChange={(e) => setQuestions((p) => p.map((x) => (x.id === q.id ? { ...x, question_text: e.target.value } : x)))}
                                 placeholder="Question"
                                 rows={2}
                               />
                               <input
                                 className="input-dark"
-                                value={q.option_a}
+                                value={q.option_a ?? ''}
                                 onChange={(e) => setQuestions((p) => p.map((x) => (x.id === q.id ? { ...x, option_a: e.target.value } : x)))}
                                 placeholder="Option A"
                               />
                               <input
                                 className="input-dark"
-                                value={q.option_b}
+                                value={q.option_b ?? ''}
                                 onChange={(e) => setQuestions((p) => p.map((x) => (x.id === q.id ? { ...x, option_b: e.target.value } : x)))}
                                 placeholder="Option B"
                               />
@@ -855,7 +855,7 @@ export default function ScenarioBuilderPage() {
 
                               <textarea
                                 className="input-dark"
-                                value={q.explanation}
+                                value={q.explanation ?? ''}
                                 onChange={(e) => setQuestions((p) => p.map((x) => (x.id === q.id ? { ...x, explanation: e.target.value } : x)))}
                                 placeholder="Explanation (optional, shown on wrong answer)"
                                 rows={2}
@@ -867,7 +867,7 @@ export default function ScenarioBuilderPage() {
                                 <input
                                   className="input-dark"
                                   type="number"
-                                  value={q.points}
+                                  value={q.points ?? 10}
                                   onChange={(e) => setQuestions((p) => p.map((x) => (x.id === q.id ? { ...x, points: Math.max(0, Math.floor(Number(e.target.value || 0))) } : x)))}
                                   style={{ maxWidth: 120 }}
                                 />

@@ -97,6 +97,15 @@
   --accent: rgba(91,76,255,0.08);
   --accent-foreground: #5B4CFF;
   --input: rgba(0,0,0,0.06);
+
+  /* Creator platform tokens — light mode */
+  --color-bg: #ffffff;
+  --color-surface: rgba(0,0,0,0.02);
+  --color-surface-2: rgba(0,0,0,0.04);
+  --color-border: rgba(0,0,0,0.08);
+  --color-border-hover: rgba(91,76,255,0.45);
+  --color-text: #0f0f14;
+  --color-text-muted: rgba(15,15,20,0.55);
 }
 
 [data-theme="light"] body {

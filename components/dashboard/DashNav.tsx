@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useThemeStyles } from '@/hooks/useThemeStyles';
+import ThemeToggleButton from '@/components/ThemeToggleButton';
 
 const LINKS = [
   { label: 'Overview', href: '/dashboard' },
@@ -104,6 +105,23 @@ export default function DashNav() {
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link
+            href="/onboarding"
+            style={{
+              padding: '6px 10px',
+              borderRadius: 999,
+              border: `1px solid ${t.border}`,
+              background: 'transparent',
+              fontSize: 12,
+              fontWeight: 800,
+              color: t.textSecondary,
+              fontFamily: 'var(--font-satoshi)',
+              whiteSpace: 'nowrap',
+              textDecoration: 'none',
+            }}
+          >
+            Onboarding
+          </Link>
           <span
             style={{
               padding: '6px 10px',
@@ -119,6 +137,7 @@ export default function DashNav() {
           >
             Demo Organization
           </span>
+          <ThemeToggleButton />
           <span
             title="User"
             style={{
