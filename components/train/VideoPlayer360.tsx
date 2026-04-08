@@ -16,6 +16,7 @@ export interface VideoPlayer360Handle {
   hideVrQuiz: () => void;
   freezeFrame: () => void;
   resumeFromFreeze: (skipSeconds?: number) => void;
+  getVideoElement: () => HTMLVideoElement | null;
 }
 
 export type VrQuizPayload = {
@@ -581,6 +582,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       hideVrQuiz,
       freezeFrame,
       resumeFromFreeze,
+      getVideoElement: () => videoRef.current,
     }));
 
     const handleStartClick = useCallback(() => {
@@ -630,8 +632,10 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
         /* src set in JS so query strings / encoding never break the inline scene HTML */
         questRef.current = /OculusBrowser|Quest/i.test(window.navigator.userAgent ?? '');
-        // VR button can be enabled again: quizzes render inside the scene for WebXR.
-        const stereoUi = 'true';
+        const ua = window.navigator.userAgent ?? '';
+        const isQuest = /OculusBrowser|Quest/i.test(ua);
+        // Quest: prefer native fullscreen 360 reprojection; also avoids WebXR black-texture issues.
+        const stereoUi = isQuest ? 'false' : 'true';
         container.innerHTML = `
           <a-scene
             embedded
@@ -648,7 +652,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               webkit-playsinline
               crossorigin="anonymous"
               preload="auto"
-              style="display:none;width:2px;height:2px;position:absolute;left:-9999px"
+              style="width:1px;height:1px;opacity:0.01;position:absolute;left:0;top:0;pointer-events:none"
             ></video>
             <a-assets>
               <canvas id="freezeCanvas" width="1280" height="640"></canvas>

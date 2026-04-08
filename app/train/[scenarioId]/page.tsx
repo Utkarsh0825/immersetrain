@@ -48,6 +48,8 @@ export default function TrainPage() {
   const [appleMobile, setAppleMobile] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [inVr, setInVr] = useState(false);
+  const [isQuest, setIsQuest] = useState(false);
+  const [quest360Mode, setQuest360Mode] = useState(false);
   const vrShownForQuestionId = useRef<string>('');
 
   const playerRef = useRef<VideoPlayer360Handle>(null);
@@ -140,6 +142,29 @@ export default function TrainPage() {
     onComplete: handleComplete,
   });
 
+  const enterQuest360 = useCallback(async () => {
+    const v = playerRef.current?.getVideoElement();
+    if (!v) return;
+    try {
+      // Quest shows a native “360°” projection option in its fullscreen player.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyV = v as any;
+      if (typeof v.requestFullscreen === 'function') {
+        await v.requestFullscreen();
+      } else if (typeof anyV.webkitEnterFullscreen === 'function') {
+        anyV.webkitEnterFullscreen();
+      }
+      setQuest360Mode(true);
+    } catch {}
+  }, []);
+
+  const exitQuest360 = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+    } catch {}
+    setQuest360Mode(false);
+  }, []);
+
   // Register time-update listener once player is ready
   useEffect(() => {
     if (!playerReady || !playerRef.current) return;
@@ -148,21 +173,33 @@ export default function TrainPage() {
       const shouldPause = quiz.checkTimestamp(time);
       if (shouldPause && !isPausedRef.current) {
         isPausedRef.current = true;
-        // Quest/WebXR: don't pause the video element (it can reset decode to frame 0).
-        // Instead, freeze the videosphere to a canvas frame.
-        playerRef.current?.freezeFrame();
+        if (isQuest && quest360Mode) {
+          // Native Quest fullscreen mode: exit fullscreen so HTML quiz can appear, then pause video.
+          void exitQuest360();
+          playerRef.current?.pause();
+        } else {
+          // Default: freeze the sphere.
+          playerRef.current?.freezeFrame();
+        }
       }
     });
     return () => cleanupTimeUpdate.current?.();
-  }, [playerReady, quiz.quizState, quiz.checkTimestamp]);
+  }, [playerReady, quiz.quizState, quiz.checkTimestamp, isQuest, quest360Mode, exitQuest360]);
 
   // Resume video when quiz returns to 'playing'
   useEffect(() => {
     if (quiz.quizState === 'playing' && isPausedRef.current) {
       isPausedRef.current = false;
-      setTimeout(() => playerRef.current?.resumeFromFreeze(0.6), 60);
+      if (isQuest && quest360Mode) {
+        setTimeout(() => {
+          playerRef.current?.play();
+          void enterQuest360();
+        }, 60);
+      } else {
+        setTimeout(() => playerRef.current?.resumeFromFreeze(0.6), 60);
+      }
     }
-  }, [quiz.quizState]);
+  }, [quiz.quizState, isQuest, quest360Mode, enterQuest360]);
 
   // When in WebXR VR mode, show questions inside the A-Frame scene (camera-attached HUD).
   useEffect(() => {
@@ -223,6 +260,11 @@ export default function TrainPage() {
 
   useEffect(() => {
     setAppleMobile(isAppleMobileWebKit());
+  }, []);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return;
+    setIsQuest(/OculusBrowser|Quest/i.test(navigator.userAgent ?? ''));
   }, []);
 
   useEffect(() => {
@@ -417,6 +459,36 @@ export default function TrainPage() {
           }}
         >
           {isFullscreen ? '⤢' : '⛶'}
+        </button>
+      )}
+
+      {/* Quest native fullscreen 360 (uses Quest reprojection menu) */}
+      {playerReady && !completed && isQuest && (
+        <button
+          type="button"
+          onClick={() => {
+            if (quest360Mode) void exitQuest360();
+            else void enterQuest360();
+          }}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: 18,
+            zIndex: 13,
+            padding: '10px 14px',
+            borderRadius: 999,
+            background: 'rgba(0,0,0,0.72)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            color: 'rgba(255,255,255,0.92)',
+            fontWeight: 800,
+            fontSize: 13,
+            cursor: 'pointer',
+            backdropFilter: 'blur(12px)',
+            letterSpacing: '0.01em',
+          }}
+        >
+          {quest360Mode ? 'Exit 360° Mode' : 'Enter 360° Mode'}
         </button>
       )}
 
