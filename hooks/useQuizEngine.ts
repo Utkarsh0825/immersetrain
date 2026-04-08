@@ -128,7 +128,7 @@ export function useQuizEngine({ questions, sessionId, onComplete }: UseQuizEngin
           lastAnswer: null,
         }));
       }
-    }, 500);
+    }, 2500);
   }, [engineState, questions, sessionId, onComplete]);
 
   const dismissFeedback = useCallback(() => {

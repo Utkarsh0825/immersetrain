@@ -173,11 +173,19 @@ export default function TrainPage() {
       return;
     }
 
-    const shouldShow = quiz.quizState === 'paused_for_question' && !!quiz.currentQuestion;
-    if (!shouldShow) {
+    // Keep the in-scene panel visible during feedback, and hide only when returning to playing/completed.
+    if (!quiz.currentQuestion) {
       player.hideVrQuiz();
       return;
     }
+    if (quiz.quizState === 'playing' || quiz.quizState === 'completed') {
+      player.hideVrQuiz();
+      return;
+    }
+    if (quiz.quizState === 'showing_feedback') {
+      return;
+    }
+    if (quiz.quizState !== 'paused_for_question') return;
 
     const q = quiz.currentQuestion!;
     if (vrShownForQuestionId.current === q.id) return;

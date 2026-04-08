@@ -252,11 +252,10 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           els.feedback?.setAttribute('visible', 'true');
           els.cursor?.setAttribute('visible', 'false');
 
-          // Dispatch to React quiz engine, then hide after a beat.
-          window.setTimeout(() => {
-            onVrQuizAnswer?.({ questionId: payload.id, chosenOption: chosen });
-            hideVrQuiz();
-          }, 900);
+          // Dispatch immediately to React quiz engine so score/answers update,
+          // but keep VR panel visible for the full feedback duration.
+          onVrQuizAnswer?.({ questionId: payload.id, chosenOption: chosen });
+          window.setTimeout(() => hideVrQuiz(), 2500);
         };
 
         h.aEnter = hoverOnA;
