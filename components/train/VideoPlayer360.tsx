@@ -286,8 +286,10 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         /* src set in JS so query strings / encoding never break the inline scene HTML */
         const ua = window.navigator.userAgent ?? '';
         const isQuest = /OculusBrowser|Quest/i.test(ua);
-        // On Quest, entering VR hides DOM overlays (questions), so hide VR button to keep quiz working.
-        const stereoUi = fullscreenOnStart || isQuest ? 'false' : 'true';
+        // Do not use A-Frame's VR/fullscreen button for quiz experiences.
+        // We fullscreen the training shell (DOM + canvas together) so questions remain visible.
+        // Quest immersive WebXR also hides DOM overlays, so keep VR UI disabled there too.
+        const stereoUi = 'false';
         container.innerHTML = `
           <a-scene
             embedded
@@ -472,7 +474,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 padding: '0 24px',
               }}
             >
-              {fullscreenOnStart ? 'Tap to Start 360° Training' : 'Click to Start 360° Training'}
+              {'Start 360° Training'}
             </p>
             <p
               style={{
@@ -485,9 +487,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 lineHeight: 1.5,
               }}
             >
-              {fullscreenOnStart
-                ? 'Uses full screen on your phone (Android: browser fullscreen; iPhone: edge-to-edge view—like inline YouTube, but for 360°). Allow motion if prompted, then move your head to look around.'
-                : 'Drag to look around. Dedicated VR headsets can use the scene’s VR control when available.'}
+              {'We’ll use fullscreen so the video + questions stay together. Allow motion if prompted, then move your head to look around.'}
             </p>
           </div>
         )}

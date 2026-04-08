@@ -14,7 +14,7 @@ import QuizOverlay from '@/components/train/QuizOverlay';
 import ProgressBar from '@/components/train/ProgressBar';
 import ScoreHUD from '@/components/train/ScoreHUD';
 import type { VideoPlayer360Handle } from '@/components/train/VideoPlayer360';
-import { exitTrainImmersive, isAppleMobileWebKit } from '@/lib/trainImmersive';
+import { enterTrainImmersive, exitTrainImmersive, isAppleMobileWebKit } from '@/lib/trainImmersive';
 
 const VideoPlayer360 = dynamic(() => import('@/components/train/VideoPlayer360'), {
   ssr: false,
@@ -46,6 +46,7 @@ export default function TrainPage() {
     );
   });
   const [appleMobile, setAppleMobile] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const playerRef = useRef<VideoPlayer360Handle>(null);
   const trainShellRef = useRef<HTMLDivElement>(null);
@@ -177,6 +178,23 @@ export default function TrainPage() {
     setAppleMobile(isAppleMobileWebKit());
   }, []);
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    // Safari legacy (best-effort)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (document as any).addEventListener?.('webkitfullscreenchange', onFsChange);
+    onFsChange();
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (document as any).removeEventListener?.('webkitfullscreenchange', onFsChange);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div style={{ height: '100vh', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
@@ -246,7 +264,7 @@ export default function TrainPage() {
         ref={playerRef}
         videoUrl={scenario?.video_url ?? DEMO_SCENARIO.video_url}
         fullscreenRootRef={trainShellRef}
-        fullscreenOnStart={isTouchLike}
+        fullscreenOnStart
         onReady={() => {
           setPlayerReady(true);
         }}
@@ -312,12 +330,40 @@ export default function TrainPage() {
           background: 'rgba(0,0,0,0.5)', borderRadius: 8, padding: '6px 12px',
           backdropFilter: 'blur(8px)', letterSpacing: '0.02em',
         }}>
-          {isTouchLike
-            ? appleMobile
-              ? 'iPhone/iPad: immersive view after Start (iOS WebKit) · allow motion · Back exits'
-              : 'Android: browser fullscreen after Start · allow motion · Back exits'
-            : 'Drag to look · Quest: stay inline for questions · PC VR: scene VR when shown'}
+          {appleMobile
+            ? 'iPhone/iPad: immersive view after Start · allow motion · Back exits'
+            : 'Fullscreen keeps questions visible · allow motion if prompted · Back exits'}
         </div>
+      )}
+
+      {/* Fullscreen toggle (shell fullscreen so quiz stays visible) */}
+      {playerReady && !completed && (
+        <button
+          type="button"
+          onClick={() => {
+            if (isFullscreen) exitTrainImmersive();
+            else enterTrainImmersive(trainShellRef.current);
+          }}
+          aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          style={{
+            position: 'absolute',
+            bottom: 16,
+            left: 16,
+            zIndex: 12,
+            width: 38,
+            height: 38,
+            borderRadius: 10,
+            background: 'rgba(0,0,0,0.55)',
+            border: '1px solid rgba(255,255,255,0.16)',
+            color: 'rgba(255,255,255,0.86)',
+            display: 'grid',
+            placeItems: 'center',
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)',
+          }}
+        >
+          {isFullscreen ? '⤢' : '⛶'}
+        </button>
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
