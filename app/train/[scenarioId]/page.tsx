@@ -316,7 +316,7 @@ export default function TrainPage() {
             ? appleMobile
               ? 'iPhone/iPad: immersive view after Start (iOS WebKit) · allow motion · Back exits'
               : 'Android: browser fullscreen after Start · allow motion · Back exits'
-            : 'Drag to look · Quest / PC VR: use scene VR when shown'}
+            : 'Drag to look · Quest: stay inline for questions · PC VR: scene VR when shown'}
         </div>
       )}
 

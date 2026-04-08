@@ -224,6 +224,11 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         return () => timeCallbacks.current.delete(cb);
       },
       enterVR: () => {
+        // Quest WebXR immersive mode hides DOM overlays, so React quiz UI won't render there.
+        // Keep the experience in “inline 360” where questions work.
+        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+        const isQuest = /OculusBrowser|Quest/i.test(ua);
+        if (isQuest) return;
         const scene =
           sceneElRef.current ??
           (containerRef.current?.querySelector('a-scene') as ASceneEl | null);
@@ -268,7 +273,10 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         resolvedSrcRef.current = resolvedSrc;
 
         /* src set in JS so query strings / encoding never break the inline scene HTML */
-        const stereoUi = fullscreenOnStart ? 'false' : 'true';
+        const ua = window.navigator.userAgent ?? '';
+        const isQuest = /OculusBrowser|Quest/i.test(ua);
+        // On Quest, entering VR hides DOM overlays (questions), so hide VR button to keep quiz working.
+        const stereoUi = fullscreenOnStart || isQuest ? 'false' : 'true';
         container.innerHTML = `
           <a-scene
             embedded
