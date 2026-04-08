@@ -55,6 +55,25 @@
   --input: rgba(255,255,255,0.06);
   --ring: #5B4CFF;
   --destructive: #ef4444;
+
+  /* Creator platform tokens (Phase 1) */
+  --color-bg: #060608;
+  --color-surface: #0d0d14;
+  --color-surface-2: #141420;
+  --color-border: rgba(255,255,255,0.06);
+  --color-border-hover: rgba(91,76,255,0.4);
+  --color-indigo: #5B4CFF;
+  --color-indigo-light: #7B6FFF;
+  --color-cyan: #00D4FF;
+  --color-text: #F0F0F5;
+  --color-text-muted: #888899;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
 }
 
 /* ── Light Mode Overrides ─────────────────────────────────── */
@@ -78,6 +97,15 @@
   --accent: rgba(91,76,255,0.08);
   --accent-foreground: #5B4CFF;
   --input: rgba(0,0,0,0.06);
+
+  /* Creator platform tokens — light mode */
+  --color-bg: #ffffff;
+  --color-surface: rgba(0,0,0,0.02);
+  --color-surface-2: rgba(0,0,0,0.04);
+  --color-border: rgba(0,0,0,0.08);
+  --color-border-hover: rgba(91,76,255,0.45);
+  --color-text: #0f0f14;
+  --color-text-muted: rgba(15,15,20,0.55);
 }
 
 [data-theme="light"] body {
@@ -190,6 +218,46 @@ body {
 
 .page-enter { opacity: 0; transform: translateY(16px); }
 .page-enter-active { opacity: 1; transform: translateY(0); transition: all 0.5s cubic-bezier(0.22,1,0.36,1); }
+
+/* Reusable component classes (Creator platform) */
+.card-dark {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.card-dark:hover {
+  border-color: var(--color-border-hover);
+}
+.btn-primary {
+  background: var(--color-indigo);
+  color: white;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 20px;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary:hover {
+  background: var(--color-indigo-light);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(91,76,255,0.3);
+}
+.input-dark {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 10px 14px;
+  font-family: 'Satoshi', sans-serif;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+.input-dark:focus {
+  outline: none;
+  border-color: var(--color-indigo);
+}
 
 @theme inline {
   --color-background: var(--background);

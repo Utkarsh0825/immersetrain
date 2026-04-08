@@ -1,124 +1,81 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { useThemeStyles } from '@/hooks/useThemeStyles';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 export default function ScenariosPage() {
   const t = useThemeStyles();
-  const glass: React.CSSProperties = {
-    background: t.surface,
-    backdropFilter: 'blur(20px)',
-    border: '1px solid ' + t.border,
-  };
+  const { user } = useCurrentUser();
+  const createdBy = (user as any)?.userId ?? (user as any)?.id ?? 'demo-user-001';
+  const [loading, setLoading] = useState(true);
+  const [orgId, setOrgId] = useState('local-org-demo');
+  const [scenarios, setScenarios] = useState<any[]>([]);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const pr = await fetch(`/api/profile?userId=${encodeURIComponent(createdBy)}`).then((r) => r.json());
+        const oid = pr?.org?.id ?? orgId;
+        setOrgId(oid);
+        const ov = await fetch(`/api/dashboard/overview?orgId=${encodeURIComponent(oid)}`).then((r) => r.json());
+        setScenarios(ov?.scenarios ?? []);
+      } catch (e: any) {
+        toast.error(e?.message ?? 'Failed to load scenarios');
+      } finally {
+        setLoading(false);
+      }
+    };
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div style={{ padding: '40px 36px', maxWidth: 1100, fontFamily: 'var(--font-satoshi)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <h1 style={{
-          fontFamily: 'var(--font-clash)', fontSize: 'clamp(28px, 3.5vw, 38px)',
-          fontWeight: 700, margin: 0, letterSpacing: '-0.03em', color: t.text,
-        }}>
-          Scenarios
-        </h1>
-        <Link href="/dashboard" style={{ fontSize: 13, color: t.textMuted, textDecoration: 'none' }}>
-          ← Back to Dashboard
-        </Link>
-      </div>
-
-      <p style={{
-        fontSize: 15, color: t.textSecondary, margin: '0 0 40px',
-        background: `linear-gradient(90deg, ${t.textSecondary}, rgba(91,76,255,0.6))`,
-        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-      }}>
-        Manage and launch your immersive training scenarios
-      </p>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {/* Scenario card */}
-        <div style={{ ...glass, borderRadius: 18, overflow: 'hidden' }}>
-          <div style={{
-            height: 140, position: 'relative',
-            background: 'linear-gradient(135deg, rgba(91,76,255,0.15) 0%, rgba(0,212,255,0.08) 100%)',
-          }}>
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(to top, rgba(6,6,8,0.9) 0%, transparent 60%)',
-            }} />
-            <div style={{
-              position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-              width: 48, height: 48, borderRadius: '50%',
-              background: 'rgba(91,76,255,0.2)', border: '1px solid rgba(91,76,255,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20,
-            }}>
-              ▶
-            </div>
-            <div style={{
-              position: 'absolute', top: 10, right: 10, padding: '3px 10px', borderRadius: 6,
-              background: 'linear-gradient(135deg, rgba(91,76,255,0.9), rgba(0,212,255,0.9))',
-              fontSize: 11, fontWeight: 700, color: 'white', letterSpacing: '0.04em',
-            }}>
-              360°
-            </div>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+        <div>
+          <div style={{ color: t.textMuted, fontFamily: 'var(--font-satoshi)', fontWeight: 800, fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Creator
           </div>
-
-          <div style={{ padding: '20px 22px' }}>
-            <h3 style={{
-              fontFamily: 'var(--font-clash)', fontSize: 17, fontWeight: 600,
-              color: t.text, margin: '0 0 6px',
-            }}>
-              Workplace Safety Training
-            </h3>
-            <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 18 }}>
-              10 questions · 30 sec video
-            </div>
-            <Link
-              href="/train/subway-tour-001"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '12px', borderRadius: 10, background: '#5B4CFF',
-                color: 'white', fontWeight: 600, fontSize: 14, textDecoration: 'none',
-                boxShadow: '0 0 30px rgba(91,76,255,0.25)',
-              }}
-            >
-              Try it →
-            </Link>
-          </div>
+          <h1 style={{ fontFamily: 'var(--font-clash)', fontWeight: 900, letterSpacing: '-0.03em', fontSize: 'clamp(26px, 3.4vw, 36px)', margin: '6px 0 0', color: t.text }}>
+            Scenarios
+          </h1>
+          <p style={{ margin: '10px 0 0', color: t.textSecondary, fontFamily: 'var(--font-satoshi)' }}>
+            Manage, share, and track your training scenarios.
+          </p>
         </div>
-
-        {/* Create new */}
-        <Link href="/create" style={{ textDecoration: 'none' }}>
-          <div style={{
-            height: '100%', borderRadius: 18, border: '2px dashed ' + t.border,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 16, padding: 32, minHeight: 300, cursor: 'pointer',
-            transition: 'border-color 0.3s',
-          }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: 14,
-              background: 'rgba(91,76,255,0.08)', border: '1px solid rgba(91,76,255,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 24, color: '#5B4CFF',
-            }}>
-              +
-            </div>
-            <div>
-              <div style={{
-                fontFamily: 'var(--font-clash)', fontSize: 16, fontWeight: 600,
-                color: t.text, textAlign: 'center', marginBottom: 4,
-              }}>
-                Create New Scenario
-              </div>
-              <div style={{ fontSize: 13, color: t.textMuted, textAlign: 'center' }}>
-                Upload 360° video and add questions
-              </div>
-            </div>
-          </div>
+        <Link href="/dashboard/create" className="btn-primary" style={{ textDecoration: 'none' }}>
+          New Scenario →
         </Link>
       </div>
+
+      {loading ? (
+        <div className="card-dark" style={{ padding: 18 }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+          {scenarios.map((s) => (
+            <div key={s.id} className="card-dark" style={{ overflow: 'hidden' }}>
+              <div style={{ aspectRatio: '16 / 9', background: 'linear-gradient(135deg, rgba(91,76,255,0.14), rgba(0,212,255,0.06))' }} />
+              <div style={{ padding: 16 }}>
+                <div style={{ fontFamily: 'var(--font-clash)', fontWeight: 800, fontSize: 16, color: t.text, marginBottom: 6 }}>{s.title}</div>
+                <div style={{ color: t.textMuted, fontFamily: 'var(--font-satoshi)', fontSize: 13, marginBottom: 12 }}>
+                  {Math.max(0, s.view_count ?? 0)} views
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <Link href={`/dashboard/create?scenarioId=${encodeURIComponent(s.id)}`} style={{ textDecoration: 'none', color: 'white', background: 'rgba(91,76,255,0.92)', borderRadius: 999, padding: '8px 12px', fontWeight: 800, fontSize: 12, fontFamily: 'var(--font-satoshi)' }}>Edit</Link>
+                  <Link href={`/dashboard/scenarios/${encodeURIComponent(s.id)}`} style={{ textDecoration: 'none', color: t.text, border: `1px solid ${t.border}`, borderRadius: 999, padding: '8px 12px', fontWeight: 800, fontSize: 12, fontFamily: 'var(--font-satoshi)' }}>Analytics</Link>
+                  <Link href={`/train/${encodeURIComponent(s.id)}`} style={{ textDecoration: 'none', color: t.text, border: `1px solid ${t.border}`, borderRadius: 999, padding: '8px 12px', fontWeight: 800, fontSize: 12, fontFamily: 'var(--font-satoshi)' }}>Open</Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <style>{`
-        @media (max-width: 768px) {
-          div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
-        }
+        @media (max-width: 1024px) { div[style*="repeat(3, minmax(0, 1fr))"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+        @media (max-width: 640px) { div[style*="repeat(3, minmax(0, 1fr))"] { grid-template-columns: 1fr !important; } }
       `}</style>
     </div>
   );

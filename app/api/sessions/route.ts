@@ -7,6 +7,11 @@ function errorMessage(err: unknown): string {
   return String(err);
 }
 
+function isUuid(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+
 /** Stable anonymous demo user (matches client useCurrentUser hook). */
 const DEMO_USER_ID = 'demo-user-001';
 
@@ -32,6 +37,10 @@ export async function POST(req: NextRequest) {
     const { scenarioId, userEmail, userName } = body;
 
     try {
+      // Local/demo scenarios use non-uuid ids (e.g. "subway-tour-001"). Don't insert invalid UUIDs.
+      if (!isUuid(scenarioId)) {
+        return NextResponse.json({ sessionId: `local-${Date.now()}`, offline: true });
+      }
       const supabase = createServiceClient();
       const { data, error } = await supabase
         .from('sessions')
