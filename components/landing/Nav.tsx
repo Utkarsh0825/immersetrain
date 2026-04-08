@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '#pricing' },
   { label: 'Demo', href: '/demo' },
+  { label: 'Onboarding', href: '/onboarding' },
 ];
 
 const spring = { type: 'spring' as const, stiffness: 400, damping: 30 };

@@ -1,5 +1,8 @@
 'use client';
 
+import { useUser } from '@clerk/nextjs';
+import { isClerkEnabled } from '@/lib/clerkEnabled';
+
 const DEMO_USER = {
   id: 'demo-user-001',
   userId: 'demo-user-001',
@@ -10,11 +13,10 @@ const DEMO_USER = {
   emailAddresses: [{ emailAddress: 'demo@immersetrain.com' }],
 };
 
-/** Demo mode: no Clerk — fixed user for training + dashboards. */
 export function useCurrentUser() {
-  return {
-    user: DEMO_USER,
-    isLoaded: true,
-    isSignedIn: true,
-  };
+  if (!isClerkEnabled()) {
+    return { user: DEMO_USER as any, isLoaded: true, isSignedIn: true };
+  }
+  const { user, isLoaded, isSignedIn } = useUser();
+  return { user: user as any, isLoaded, isSignedIn };
 }

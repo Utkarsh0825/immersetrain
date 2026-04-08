@@ -3,6 +3,7 @@ import { Inter, Syne } from 'next/font/google';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { Toaster } from 'sonner';
 import './globals.css';
+import { ClerkProvider } from '@clerk/nextjs';
 
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'], display: 'swap' });
 const syne = Syne({
@@ -25,13 +26,23 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   return (
     <html lang="en" className={`${inter.variable} ${syne.variable}`} suppressHydrationWarning>
       <body>
-        <ThemeProvider>
-          {children}
-          <Toaster position="top-right" theme="dark" />
-        </ThemeProvider>
+        {clerkEnabled ? (
+          <ClerkProvider>
+            <ThemeProvider>
+              {children}
+              <Toaster position="top-right" theme="dark" />
+            </ThemeProvider>
+          </ClerkProvider>
+        ) : (
+          <ThemeProvider>
+            {children}
+            <Toaster position="top-right" theme="dark" />
+          </ThemeProvider>
+        )}
       </body>
     </html>
   );

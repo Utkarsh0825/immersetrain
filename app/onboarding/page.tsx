@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useThemeStyles } from '@/hooks/useThemeStyles';
+import ThemeToggleButton from '@/components/ThemeToggleButton';
 
 const INDUSTRIES = [
   { key: 'Transit & Rail', label: 'Transit & Rail', icon: '🚇' },
@@ -22,6 +23,7 @@ const SIZES = ['1–10', '11–50', '51–200', '200+'] as const;
 
 function StepDots({ step }: { step: 1 | 2 | 3 }) {
   const dots = [1, 2, 3] as const;
+  const t = useThemeStyles();
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
       {dots.map((d, i) => {
@@ -35,7 +37,7 @@ function StepDots({ step }: { step: 1 | 2 | 3 }) {
                 height: 12,
                 borderRadius: 999,
                 background: complete || active ? 'var(--color-indigo)' : 'transparent',
-                border: complete || active ? '1px solid rgba(91,76,255,0.5)' : '1px solid rgba(255,255,255,0.18)',
+                border: complete || active ? '1px solid rgba(91,76,255,0.5)' : `1px solid ${t.border}`,
                 boxShadow: active ? '0 0 18px rgba(91,76,255,0.35)' : 'none',
                 display: 'grid',
                 placeItems: 'center',
@@ -43,11 +45,11 @@ function StepDots({ step }: { step: 1 | 2 | 3 }) {
               aria-label={`Step ${d}`}
             >
               {complete ? (
-                <span style={{ color: 'white', fontSize: 10, lineHeight: 1 }}>✓</span>
+                <span style={{ color: t.isDark ? 'white' : '#0f0f14', fontSize: 10, lineHeight: 1 }}>✓</span>
               ) : null}
             </div>
             {i !== dots.length - 1 && (
-              <div style={{ width: 44, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+              <div style={{ width: 44, height: 1, background: t.border }} />
             )}
           </div>
         );
@@ -114,7 +116,7 @@ export default function OnboardingPage() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#060608',
+        background: t.bg,
         display: 'grid',
         placeItems: 'center',
         padding: '28px 18px',
@@ -129,7 +131,9 @@ export default function OnboardingPage() {
           position: 'absolute',
           inset: -200,
           background:
-            'radial-gradient(700px 500px at 50% 20%, rgba(91,76,255,0.28), transparent 65%), radial-gradient(800px 600px at 10% 80%, rgba(0,212,255,0.14), transparent 60%)',
+            t.isDark
+              ? 'radial-gradient(700px 500px at 50% 20%, rgba(91,76,255,0.28), transparent 65%), radial-gradient(800px 600px at 10% 80%, rgba(0,212,255,0.14), transparent 60%)'
+              : 'radial-gradient(700px 500px at 50% 20%, rgba(91,76,255,0.14), transparent 65%), radial-gradient(800px 600px at 10% 80%, rgba(0,212,255,0.08), transparent 60%)',
           filter: 'blur(18px)',
         }}
       />
@@ -142,18 +146,41 @@ export default function OnboardingPage() {
           padding: 28,
           position: 'relative',
           zIndex: 1,
-          background: 'rgba(13,13,20,0.88)',
+          background: t.isDark ? 'rgba(13,13,20,0.88)' : 'rgba(255,255,255,0.80)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: `1px solid ${t.border}`,
         }}
       >
-        <StepDots step={step} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <Link
+            href="/"
+            style={{
+              fontFamily: 'var(--font-clash)',
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              textDecoration: 'none',
+              color: t.text,
+            }}
+          >
+            ImmerseTrain
+          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <ThemeToggleButton />
+            <Link href="/dashboard" style={{ color: t.textSecondary, textDecoration: 'none', fontWeight: 700, fontSize: 13 }}>
+              Dashboard
+            </Link>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 18 }}>
+          <StepDots step={step} />
+        </div>
 
         <div style={{ textAlign: 'center', marginTop: 22, marginBottom: 22 }}>
           <h1 style={{ fontFamily: 'var(--font-clash)', fontSize: 30, margin: 0, letterSpacing: '-0.03em' }}>
             Welcome to ImmerseTrain
           </h1>
-          <p style={{ margin: '10px 0 0', color: 'rgba(240,240,245,0.72)', lineHeight: 1.5 }}>
+          <p style={{ margin: '10px 0 0', color: t.textSecondary, lineHeight: 1.5 }}>
             Let’s set up your workspace in 60 seconds.
           </p>
         </div>
@@ -161,13 +188,13 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <label style={{ display: 'block', marginBottom: 8, color: 'rgba(240,240,245,0.75)', fontWeight: 600 }}>
+              <label style={{ display: 'block', marginBottom: 8, color: t.textSecondary, fontWeight: 600 }}>
                 Full name
               </label>
               <input className="input-dark" value={fullName} onChange={(e) => setFullName(e.target.value)} />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: 8, color: 'rgba(240,240,245,0.75)', fontWeight: 600 }}>
+              <label style={{ display: 'block', marginBottom: 8, color: t.textSecondary, fontWeight: 600 }}>
                 Work email
               </label>
               <input className="input-dark" value={workEmail} readOnly />
@@ -178,14 +205,14 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', marginBottom: 8, color: 'rgba(240,240,245,0.75)', fontWeight: 600 }}>
+              <label style={{ display: 'block', marginBottom: 8, color: t.textSecondary, fontWeight: 600 }}>
                 Organization name
               </label>
               <input className="input-dark" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: 10, color: 'rgba(240,240,245,0.75)', fontWeight: 600 }}>
+              <label style={{ display: 'block', marginBottom: 10, color: t.textSecondary, fontWeight: 600 }}>
                 Industry
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
@@ -200,13 +227,13 @@ export default function OnboardingPage() {
                         textAlign: 'left',
                         padding: '12px 12px',
                         borderRadius: 12,
-                        border: selected ? '1px solid rgba(91,76,255,0.55)' : '1px solid rgba(255,255,255,0.08)',
-                        background: selected ? 'rgba(91,76,255,0.10)' : 'rgba(255,255,255,0.02)',
+                        border: selected ? '1px solid rgba(91,76,255,0.55)' : `1px solid ${t.border}`,
+                        background: selected ? 'rgba(91,76,255,0.10)' : t.cardBg,
                         cursor: 'pointer',
                         display: 'flex',
                         gap: 10,
                         alignItems: 'center',
-                        color: 'rgba(240,240,245,0.92)',
+                        color: t.text,
                       }}
                     >
                       <span style={{ fontSize: 18 }}>{it.icon}</span>
@@ -223,7 +250,7 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', marginBottom: 10, color: 'rgba(240,240,245,0.75)', fontWeight: 600 }}>
+              <label style={{ display: 'block', marginBottom: 10, color: t.textSecondary, fontWeight: 600 }}>
                 How large is your team?
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
@@ -237,22 +264,22 @@ export default function OnboardingPage() {
                       style={{
                         padding: 14,
                         borderRadius: 14,
-                        border: selected ? '1px solid rgba(91,76,255,0.55)' : '1px solid rgba(255,255,255,0.08)',
-                        background: selected ? 'rgba(91,76,255,0.10)' : 'rgba(255,255,255,0.02)',
+                        border: selected ? '1px solid rgba(91,76,255,0.55)' : `1px solid ${t.border}`,
+                        background: selected ? 'rgba(91,76,255,0.10)' : t.cardBg,
                         cursor: 'pointer',
                         textAlign: 'left',
-                        color: 'rgba(240,240,245,0.92)',
+                        color: t.text,
                       }}
                     >
                       <div style={{ fontFamily: 'var(--font-clash)', fontSize: 20, fontWeight: 700 }}>{s}</div>
-                      <div style={{ color: 'rgba(240,240,245,0.6)', fontSize: 12, fontWeight: 600 }}>people</div>
+                      <div style={{ color: t.textSecondary, fontSize: 12, fontWeight: 600 }}>people</div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: 'rgba(240,240,245,0.72)' }}>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: t.textSecondary }}>
               <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
               <span>
                 I agree to the{' '}
@@ -277,9 +304,9 @@ export default function OnboardingPage() {
               flex: 1,
               padding: '12px 14px',
               borderRadius: 999,
-              border: '1px solid rgba(255,255,255,0.10)',
-              background: 'rgba(255,255,255,0.04)',
-              color: 'rgba(240,240,245,0.75)',
+              border: `1px solid ${t.border}`,
+              background: t.surface,
+              color: t.textSecondary,
               fontWeight: 700,
               cursor: step === 1 ? 'not-allowed' : 'pointer',
             }}
