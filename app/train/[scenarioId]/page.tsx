@@ -16,7 +16,8 @@ import ScoreHUD from '@/components/train/ScoreHUD';
 import type { VideoPlayer360Handle, VrQuizPayload } from '@/components/train/VideoPlayer360';
 import { enterTrainImmersive, exitTrainImmersive, isAppleMobileWebKit } from '@/lib/trainImmersive';
 
-const VideoPlayer360 = dynamic(() => import('@/components/train/VideoPlayer360'), {
+/** A-Frame + WebXR run inside `/vr-player.html` (iframe) so React never touches that WebGL document. */
+const TrainVrIframePlayer = dynamic(() => import('@/components/train/TrainVrIframePlayer'), {
   ssr: false,
   loading: () => (
     <div style={{ position: 'absolute', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
@@ -307,7 +308,7 @@ export default function TrainPage() {
       </div>
 
       {/* ── 360° Video ── */}
-      <VideoPlayer360
+      <TrainVrIframePlayer
         ref={playerRef}
         videoUrl={scenario?.video_url ?? DEMO_SCENARIO.video_url}
         fullscreenRootRef={trainShellRef}
