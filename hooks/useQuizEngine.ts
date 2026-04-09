@@ -34,6 +34,8 @@ export function useQuizEngine({ questions, sessionId, onComplete }: UseQuizEngin
   const checkTimestamp = useCallback((currentTimeSeconds: number) => {
     if (engineState.state !== 'playing') return false;
 
+    /* Cue band: question fires once while playback time is in [timestamp_seconds, timestamp_seconds + 2).
+     * VR path uses FREEZE at hit time + resumeFromFreeze(~0.35s); answeredQuestions prevents repeats. */
     const triggered = questions.find(
       (q) =>
         !engineState.answeredQuestions.has(q.id) &&

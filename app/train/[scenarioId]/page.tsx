@@ -161,7 +161,7 @@ export default function TrainPage() {
   useEffect(() => {
     if (quiz.quizState === 'playing' && isPausedRef.current) {
       isPausedRef.current = false;
-      setTimeout(() => playerRef.current?.resumeFromFreeze(0.6), 60);
+      setTimeout(() => playerRef.current?.resumeFromFreeze(0.35), 60);
     }
   }, [quiz.quizState]);
 
@@ -198,6 +198,7 @@ export default function TrainPage() {
       id: q.id,
       questionIndex: quiz.answeredCount,
       totalQuestions: quiz.totalQuestions,
+      timestamp: q.timestamp_seconds,
       questionText: q.question_text ?? '',
       optionA: q.option_a ?? '',
       optionB: q.option_b ?? '',

@@ -22,6 +22,8 @@ export type VrQuizPayload = {
   id: string;
   questionIndex: number;
   totalQuestions: number;
+  /** Scenario cue time (seconds) — forwarded to iframe for strict VR analytics / sync. */
+  timestamp?: number;
   questionText: string;
   optionA: string;
   optionB: string;

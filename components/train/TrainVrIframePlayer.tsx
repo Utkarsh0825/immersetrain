@@ -142,7 +142,7 @@ const TrainVrIframePlayer = forwardRef<VideoPlayer360Handle, TrainVrIframePlayer
       resumeFromFreeze: (skipSeconds?: number) =>
         postToIframe(iframeRef.current?.contentWindow, {
           type: 'RESUME_FROM_FREEZE',
-          skipSeconds: skipSeconds ?? 0.6,
+          skipSeconds: skipSeconds ?? 0.35,
         }),
     }));
 

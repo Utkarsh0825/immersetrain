@@ -9,6 +9,38 @@
     #a-root { position: absolute; inset: 0; }
   </style>
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script>
+    /* Must run before <a-scene> parses so `immersetrain-quiz-hit` is known. */
+    (function () {
+      if (typeof AFRAME === 'undefined') return;
+      AFRAME.registerComponent('immersetrain-quiz-hit', {
+        schema: { choice: { type: 'string', default: 'a' } },
+        init: function () {
+          this.onClick = this.onClick.bind(this);
+          this.onEnter = this.onEnter.bind(this);
+          this.onLeave = this.onLeave.bind(this);
+          this.el.addEventListener('click', this.onClick);
+          this.el.addEventListener('mouseenter', this.onEnter);
+          this.el.addEventListener('mouseleave', this.onLeave);
+        },
+        onClick: function () {
+          var c = this.data.choice === 'b' ? 'b' : 'a';
+          if (typeof window.IT_onQuizHit === 'function') window.IT_onQuizHit(c);
+        },
+        onEnter: function () {
+          this.el.setAttribute('material', 'color: #2a2a4e; shader: flat; opacity: 0.98; side: double');
+        },
+        onLeave: function () {
+          this.el.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98; side: double');
+        },
+        remove: function () {
+          this.el.removeEventListener('click', this.onClick);
+          this.el.removeEventListener('mouseenter', this.onEnter);
+          this.el.removeEventListener('mouseleave', this.onLeave);
+        },
+      });
+    })();
+  </script>
 </head>
 <body>
   <div id="a-root">
@@ -39,6 +71,7 @@
         rotation="0 -90 0"
         visible="true"
       ></a-videosphere>
+      <!-- Hands as rig children: laser raycaster only intersects .clickable (quiz planes), not the videosphere. -->
       <a-entity id="camera-rig" position="0 1.6 0">
         <a-camera id="main-camera" look-controls="pointerLockEnabled: false" wasd-controls="enabled: false">
           <a-entity id="vr-start-screen" visible="false">
@@ -84,7 +117,7 @@
             material="color: #FFFFFF; shader: flat; opacity: 0.85"
             animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.5 0.5 0.5; dur: 1500; easing: easeInCubic"
             animation__fusend="property: scale; startEvents: mouseleave; from: 0.5 0.5 0.5; to: 1 1 1; dur: 150"
-            raycaster="objects: .clickable; far: 8"
+            raycaster="objects: .clickable; far: 20; interval: 50"
             visible="false"
           ></a-entity>
           <a-entity id="quiz-panel" position="0 -0.25 -1.8" visible="false">
@@ -103,22 +136,47 @@
             <a-text id="quiz-label" value="QUESTION 1 OF 10" color="#5B4CFF" align="left" anchor="left" width="1.25" position="-0.69 0.33 0.002"></a-text>
             <a-text id="quiz-points" value="+ 10 pts" color="#00D4FF" align="right" anchor="right" width="1.0" position="0.69 0.33 0.002"></a-text>
             <a-text id="quiz-question" value="Loading question..." color="#FFFFFF" align="left" anchor="left" width="1.25" wrap-count="40" position="-0.69 0.15 0.002"></a-text>
-            <a-entity id="option-a-btn" class="clickable" position="0 -0.12 0.002">
-              <a-plane id="option-a-bg" width="1.34" height="0.17" material="color: #1a1a2e; shader: flat; opacity: 0.98; side: double"></a-plane>
-              <a-text id="option-a-label" value="A" color="#5B4CFF" align="left" anchor="left" width="0.3" position="-0.62 0 0.001"></a-text>
-              <a-text id="option-a-text" value="Option A" color="#FFFFFF" align="left" anchor="left" width="1.1" wrap-count="38" position="-0.52 0 0.001"></a-text>
+            <!-- Hit target = planes with class clickable (raycaster ignores videosphere). Text sits slightly behind so laser hits the plane. -->
+            <a-entity id="option-a-btn" position="0 -0.12 0.002">
+              <a-plane
+                id="option-a-bg"
+                class="clickable"
+                width="1.34"
+                height="0.17"
+                position="0 0 0"
+                material="color: #1a1a2e; shader: flat; opacity: 0.98; side: double"
+                immersetrain-quiz-hit="choice: a"
+              ></a-plane>
+              <a-text id="option-a-label" value="A" color="#5B4CFF" align="left" anchor="left" width="0.3" position="-0.62 0 -0.006"></a-text>
+              <a-text id="option-a-text" value="Option A" color="#FFFFFF" align="left" anchor="left" width="1.1" wrap-count="38" position="-0.52 0 -0.006"></a-text>
             </a-entity>
-            <a-entity id="option-b-btn" class="clickable" position="0 -0.33 0.002">
-              <a-plane id="option-b-bg" width="1.34" height="0.17" material="color: #1a1a2e; shader: flat; opacity: 0.98; side: double"></a-plane>
-              <a-text id="option-b-label" value="B" color="#5B4CFF" align="left" anchor="left" width="0.3" position="-0.62 0 0.001"></a-text>
-              <a-text id="option-b-text" value="Option B" color="#FFFFFF" align="left" anchor="left" width="1.1" wrap-count="38" position="-0.52 0 0.001"></a-text>
+            <a-entity id="option-b-btn" position="0 -0.33 0.002">
+              <a-plane
+                id="option-b-bg"
+                class="clickable"
+                width="1.34"
+                height="0.17"
+                position="0 0 0"
+                material="color: #1a1a2e; shader: flat; opacity: 0.98; side: double"
+                immersetrain-quiz-hit="choice: b"
+              ></a-plane>
+              <a-text id="option-b-label" value="B" color="#5B4CFF" align="left" anchor="left" width="0.3" position="-0.62 0 -0.006"></a-text>
+              <a-text id="option-b-text" value="Option B" color="#FFFFFF" align="left" anchor="left" width="1.1" wrap-count="38" position="-0.52 0 -0.006"></a-text>
             </a-entity>
             <a-text id="quiz-feedback" value="" color="#22c55e" align="center" width="1.25" wrap-count="44" position="0 -0.55 0.002" visible="false"></a-text>
           </a-entity>
         </a-camera>
+        <a-entity
+          id="left-hand"
+          laser-controls="hand: left"
+          raycaster="objects: .clickable; far: 20; interval: 50; lineColor: #00D4FF; lineOpacity: 0.85; showLine: true"
+        ></a-entity>
+        <a-entity
+          id="right-hand"
+          laser-controls="hand: right"
+          raycaster="objects: .clickable; far: 20; interval: 50; lineColor: #00D4FF; lineOpacity: 0.85; showLine: true"
+        ></a-entity>
       </a-entity>
-      <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 10"></a-entity>
-      <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 10"></a-entity>
     </a-scene>
   </div>
 
@@ -155,7 +213,6 @@
   var inFreeze = false;
   var timeThrottle = 0;
   var videoListenersAttached = false;
-  var vrHandlers = { a: null, b: null, aEnter: null, aLeave: null, bEnter: null, bLeave: null };
   var vrEls = {};
   var startHandlers = { click: null, trigger: null, select: null };
 
@@ -189,6 +246,7 @@
   }
 
   function hideVrQuiz() {
+    window.IT_onQuizHit = null;
     setVrQuizVisible(false);
   }
 
@@ -196,26 +254,31 @@
     var els = vrEls;
     if (!els.panel) return;
 
-    els.label.setAttribute('value', 'QUESTION ' + Math.min(payload.questionIndex + 1, payload.totalQuestions) + ' OF ' + payload.totalQuestions);
+    var qIdx = typeof payload.questionIndex === 'number' ? payload.questionIndex : 0;
+    var totalQ = typeof payload.totalQuestions === 'number' ? payload.totalQuestions : 10;
+    var freezeT = typeof payload.timestamp === 'number' ? payload.timestamp : null;
+
+    els.label.setAttribute(
+      'value',
+      'QUESTION ' + Math.min(qIdx + 1, totalQ) + ' OF ' + totalQ
+    );
     els.points.setAttribute('value', '+ ' + (payload.points != null ? payload.points : 10) + ' pts');
     els.q.setAttribute('value', payload.questionText || '');
     els.aText.setAttribute('value', payload.optionA || '');
     els.bText.setAttribute('value', payload.optionB || '');
 
-    els.aBg.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98');
-    els.bBg.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98');
+    els.aBg.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98; side: double');
+    els.bBg.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98; side: double');
     els.feedback.setAttribute('visible', 'false');
     els.feedback.setAttribute('value', '');
     els.cursor.setAttribute('visible', 'true');
 
-    if (els.aBtn && vrHandlers.a) els.aBtn.removeEventListener('click', vrHandlers.a);
-    if (els.bBtn && vrHandlers.b) els.bBtn.removeEventListener('click', vrHandlers.b);
-    if (els.aBtn && vrHandlers.aEnter) els.aBtn.removeEventListener('mouseenter', vrHandlers.aEnter);
-    if (els.aBtn && vrHandlers.aLeave) els.aBtn.removeEventListener('mouseleave', vrHandlers.aLeave);
-    if (els.bBtn && vrHandlers.bEnter) els.bBtn.removeEventListener('mouseenter', vrHandlers.bEnter);
-    if (els.bBtn && vrHandlers.bLeave) els.bBtn.removeEventListener('mouseleave', vrHandlers.bLeave);
+    var answered = false;
 
     function answer(chosen) {
+      if (answered) return;
+      answered = true;
+      window.IT_onQuizHit = null;
       var correct = payload.correctOption;
       var isCorrect = chosen === correct;
       var chosenBg = chosen === 'a' ? els.aBg : els.bBg;
@@ -235,23 +298,19 @@
       els.feedback.setAttribute('visible', 'true');
       els.cursor.setAttribute('visible', 'false');
 
-      post('VR_QUIZ_ANSWER', { questionId: payload.id, chosenOption: chosen });
+      post('VR_QUIZ_ANSWER', {
+        questionId: payload.id,
+        chosenOption: chosen,
+        timestamp: freezeT != null ? freezeT : frozenAt,
+        videoTime: video ? video.currentTime : null,
+      });
       setTimeout(hideVrQuiz, 2500);
     }
 
-    vrHandlers.aEnter = function () { els.aBg.setAttribute('material', 'color: #2a2a4e; shader: flat; opacity: 0.98'); };
-    vrHandlers.aLeave = function () { els.aBg.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98'); };
-    vrHandlers.bEnter = function () { els.bBg.setAttribute('material', 'color: #2a2a4e; shader: flat; opacity: 0.98'); };
-    vrHandlers.bLeave = function () { els.bBg.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98'); };
-    vrHandlers.a = function () { answer('a'); };
-    vrHandlers.b = function () { answer('b'); };
-
-    els.aBtn.addEventListener('mouseenter', vrHandlers.aEnter);
-    els.aBtn.addEventListener('mouseleave', vrHandlers.aLeave);
-    els.bBtn.addEventListener('mouseenter', vrHandlers.bEnter);
-    els.bBtn.addEventListener('mouseleave', vrHandlers.bLeave);
-    els.aBtn.addEventListener('click', vrHandlers.a);
-    els.bBtn.addEventListener('click', vrHandlers.b);
+    window.IT_onQuizHit = function (choice) {
+      var c = choice === 'b' ? 'b' : 'a';
+      answer(c);
+    };
 
     setVrQuizVisible(true);
   }
@@ -261,6 +320,7 @@
     var t = video.currentTime || lastKnownTime;
     frozenAt = t;
     inFreeze = true;
+    post('FREEZE_AT', { time: frozenAt });
     try {
       var ctx = freezeCanvas.getContext('2d');
       if (ctx) ctx.drawImage(video, 0, 0, freezeCanvas.width, freezeCanvas.height);
@@ -280,9 +340,11 @@
   }
 
   function resumeFromFreeze(skipSeconds) {
-    skipSeconds = skipSeconds == null ? 0.6 : skipSeconds;
+    /* Small skip clears the same timestamp band so the quiz engine does not immediately re-trigger. */
+    skipSeconds = skipSeconds == null ? 0.35 : skipSeconds;
     if (!video || !sphere) return;
-    var target = Math.max(0, (frozenAt || video.currentTime || lastKnownTime) + skipSeconds);
+    var base = frozenAt || video.currentTime || lastKnownTime;
+    var target = Math.max(0, base + skipSeconds);
     inFreeze = false;
     if (freezeGuard) {
       clearInterval(freezeGuard);
@@ -301,6 +363,7 @@
       swapBack();
     }
     setTimeout(swapBack, 300);
+    post('RESUME_AT', { from: base, to: target, skip: skipSeconds });
   }
 
   function startVrVideoFromGesture() {
@@ -472,11 +535,13 @@
         }, 140);
         break;
       }
-      case 'SEEK':
+      case 'SEEK': {
+        var seekT = typeof d.timeSeconds === 'number' ? d.timeSeconds : typeof d.time === 'number' ? d.time : 0;
         try {
-          video.currentTime = Math.max(0, d.timeSeconds || 0);
+          video.currentTime = Math.max(0, seekT);
         } catch (e) {}
         break;
+      }
       case 'FREEZE_FRAME':
         freezeFrame();
         break;
