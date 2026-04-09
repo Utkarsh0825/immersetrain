@@ -548,7 +548,7 @@ export default function TrainPage() {
             letterSpacing: '0.01em',
           }}
         >
-          {quest360Mode ? 'Exit 360° Mode' : 'Enter 360° Mode'}
+          {quest360Mode ? 'Exit 360° Mode' : '⛶ Fullscreen 360°'}
         </button>
       )}
 

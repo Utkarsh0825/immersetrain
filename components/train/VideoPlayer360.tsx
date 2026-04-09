@@ -572,10 +572,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         return () => timeCallbacks.current.delete(cb);
       },
       enterVR: () => {
-        const scene =
-          sceneElRef.current ??
-          (containerRef.current?.querySelector('a-scene') as ASceneEl | null);
-        scene?.enterVR?.();
+        // WebXR disabled for this experience; Quest uses native video fullscreen 360 mode.
       },
       setVrQuizVisible,
       showVrQuiz,
@@ -629,17 +626,15 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         const origin = window.location.origin;
         const ua = window.navigator.userAgent ?? '';
         const isQuest = /OculusBrowser|Quest/i.test(ua);
-        // DEBUG TEST (Quest): use a known-good 360 MP4 to isolate decoder/encoding issues.
-        // If this works in Quest VR, our local subway360.mp4 encoding is the culprit.
-        const questTestSrc = 'https://cdn.aframe.io/360-video-boilerplate/video/city.mp4';
         const baseSrc = videoUrl.startsWith('/') ? `${origin}${videoUrl}` : videoUrl;
-        const resolvedSrc = isQuest ? questTestSrc : baseSrc;
+        const resolvedSrc = baseSrc;
         resolvedSrcRef.current = resolvedSrc;
 
         /* src set in JS so query strings / encoding never break the inline scene HTML */
         questRef.current = isQuest;
         // Quest: prefer native fullscreen 360 reprojection; also avoids WebXR black-texture issues.
-        const stereoUi = isQuest ? 'false' : 'true';
+        // We are not using WebXR for Quest 360 playback. Hide the VR button everywhere.
+        const stereoUi = 'false';
         container.innerHTML = `
           <a-scene
             embedded
