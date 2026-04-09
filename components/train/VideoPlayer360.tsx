@@ -16,7 +16,6 @@ export interface VideoPlayer360Handle {
   hideVrQuiz: () => void;
   freezeFrame: () => void;
   resumeFromFreeze: (skipSeconds?: number) => void;
-  getVideoElement: () => HTMLVideoElement | null;
 }
 
 export type VrQuizPayload = {
@@ -326,7 +325,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
     const freezeFrame = useCallback(() => {
       const v = videoRef.current;
-      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#videosphere') as any | null);
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
       const canvas =
         freezeCanvasRef.current ??
         (containerRef.current?.querySelector('#freezeCanvas') as HTMLCanvasElement | null);
@@ -345,9 +344,9 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
       } catch {}
 
-      // Swap sphere to frozen canvas texture (no pause/play = no Quest decode reset).
+      // Swap videosphere to frozen canvas texture (no pause/play = no Quest decode reset).
       try {
-        sphere.setAttribute('material', 'src: #freezeCanvas; side: back; shader: flat;');
+        sphere.setAttribute('src', '#freezeCanvas');
       } catch {}
 
       // Mute while question is shown (video continues in background).
@@ -370,7 +369,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
     const resumeFromFreeze = useCallback((skipSeconds: number = 0.6) => {
       const v = videoRef.current;
-      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#videosphere') as any | null);
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
       if (!v || !sphere) return;
 
       const target = Math.max(0, (frozenAtRef.current || v.currentTime || lastKnownTimeRef.current) + skipSeconds);
@@ -384,7 +383,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       // Swap back to live texture and force playback to continue.
       const swapBack = () => {
         try {
-          sphere.setAttribute('material', 'src: #trainingvideo; side: back; shader: flat;');
+          sphere.setAttribute('src', '#trainingvideo');
         } catch {}
         v.muted = false;
         void v.play().catch(() => {});
@@ -407,7 +406,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     const startVrVideoFromGesture = useCallback(() => {
       const scene = sceneElRef.current as any;
       const v = videoRef.current;
-      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#videosphere') as any | null);
+      const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
       const startUi =
         vrStartBtnRef.current ?? (containerRef.current?.querySelector('#vr-start-btn') as HTMLElement | null);
       const startText =
@@ -427,7 +426,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
       // KEY: play() invoked from user gesture inside WebXR session.
       // Bind sphere BEFORE play; then play after a short delay to allow WebGL texture binding.
       try {
-        sphere.setAttribute('material', 'src: #trainingvideo; side: back; shader: flat;');
+        sphere.setAttribute('src', '#trainingvideo');
       } catch {}
 
       window.setTimeout(() => {
@@ -572,14 +571,16 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         return () => timeCallbacks.current.delete(cb);
       },
       enterVR: () => {
-        // WebXR disabled for this experience; Quest uses native video fullscreen 360 mode.
+        const scene =
+          sceneElRef.current ??
+          (containerRef.current?.querySelector('a-scene') as ASceneEl | null);
+        scene?.enterVR?.();
       },
       setVrQuizVisible,
       showVrQuiz,
       hideVrQuiz,
       freezeFrame,
       resumeFromFreeze,
-      getVideoElement: () => videoRef.current,
     }));
 
     const handleStartClick = useCallback(() => {
@@ -624,17 +625,13 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         if (cancelled || !containerRef.current) return;
 
         const origin = window.location.origin;
-        const ua = window.navigator.userAgent ?? '';
-        const isQuest = /OculusBrowser|Quest/i.test(ua);
-        const baseSrc = videoUrl.startsWith('/') ? `${origin}${videoUrl}` : videoUrl;
-        const resolvedSrc = baseSrc;
+        const resolvedSrc = videoUrl.startsWith('/') ? `${origin}${videoUrl}` : videoUrl;
         resolvedSrcRef.current = resolvedSrc;
 
         /* src set in JS so query strings / encoding never break the inline scene HTML */
-        questRef.current = isQuest;
-        // Quest: prefer native fullscreen 360 reprojection; also avoids WebXR black-texture issues.
-        // We are not using WebXR for Quest 360 playback. Hide the VR button everywhere.
-        const stereoUi = 'false';
+        questRef.current = /OculusBrowser|Quest/i.test(window.navigator.userAgent ?? '');
+        // VR button can be enabled again: quizzes render inside the scene for WebXR.
+        const stereoUi = 'true';
         container.innerHTML = `
           <a-scene
             embedded
@@ -644,7 +641,6 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
             vr-mode-ui="enabled: ${stereoUi}"
             device-orientation-permission-ui="enabled: true"
           >
-            <!-- Quest native mode: keep the scene for 2D preview, but the immersive path uses fullscreen <video>. -->
             <video
               id="trainingvideo"
               muted
@@ -652,21 +648,17 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               webkit-playsinline
               crossorigin="anonymous"
               preload="auto"
-              ${isQuest ? 'controls' : ''}
-              style="width:1px;height:1px;opacity:0.01;position:absolute;left:0;top:0;pointer-events:none"
+              style="position:absolute;top:0;left:0;width:1px;height:1px;opacity:0.01;pointer-events:none"
             ></video>
             <a-assets>
               <canvas id="freezeCanvas" width="1280" height="640"></canvas>
             </a-assets>
-            <a-sphere
-              id="videosphere"
-              radius="100"
-              position="0 0 0"
+            <a-videosphere
+              id="immersive-sphere"
+              src="#trainingvideo"
               rotation="0 -90 0"
-              material="src: #trainingvideo; side: back; shader: flat;"
-              segments-height="32"
-              segments-width="32"
-            ></a-sphere>
+              visible="true"
+            ></a-videosphere>
             <a-entity id="camera-rig" position="0 1.6 0">
               <a-camera id="main-camera" look-controls="pointerLockEnabled: false" wasd-controls="enabled: false">
                 <a-entity id="vr-start-screen" visible="false">
@@ -777,7 +769,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
         const scene = container.querySelector('a-scene') as ASceneEl | null;
         sceneElRef.current = scene;
-        sphereRef.current = container.querySelector('#videosphere') as any | null;
+        sphereRef.current = container.querySelector('#immersive-sphere') as HTMLElement | null;
         freezeCanvasRef.current = container.querySelector('#freezeCanvas') as HTMLCanvasElement | null;
         vrStartScreenRef.current = container.querySelector('#vr-start-screen') as HTMLElement | null;
         vrStartBtnRef.current = container.querySelector('#vr-start-btn') as HTMLElement | null;
@@ -799,23 +791,6 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         const wireVr = () => {
           if (!sceneElRef.current) return;
           const s = sceneElRef.current as any;
-
-          const forceTextureUpdate = () => {
-            const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#videosphere') as any | null);
-            if (!sphere) return;
-            try {
-              const mat = sphere?.components?.material?.material;
-              if (mat?.map) mat.map.needsUpdate = true;
-              if (mat) mat.needsUpdate = true;
-            } catch {}
-            try {
-              const mesh = sphere.getObject3D?.('mesh');
-              const m = mesh?.material;
-              if (m?.map) m.map.needsUpdate = true;
-              if (m) m.needsUpdate = true;
-            } catch {}
-          };
-
           const enter = () => {
             setInVr(true);
             onVrModeChange?.(true);
@@ -830,7 +805,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               } catch {}
               try {
                 // Delay binding sphere until play succeeds inside VR.
-                sphereRef.current?.setAttribute('material', 'src: ; side: back; shader: flat;');
+                sphereRef.current?.setAttribute('src', '');
               } catch {}
               try {
                 if (videoRef.current) videoRef.current.muted = true;
@@ -840,16 +815,6 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
                 if (videoRef.current && !videoRef.current.paused) videoRef.current.pause();
               } catch {}
             }
-
-            // Force texture update burst on enter-vr (Quest WebXR black texture mitigation).
-            forceTextureUpdate();
-            window.setTimeout(forceTextureUpdate, 500);
-            let count = 0;
-            const interval = window.setInterval(() => {
-              forceTextureUpdate();
-              count++;
-              if (count > 30) window.clearInterval(interval);
-            }, 100);
           };
           const exit = () => {
             setInVr(false);
@@ -863,7 +828,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               } catch {}
               // Restore normal binding on exit.
               try {
-                sphereRef.current?.setAttribute('material', 'src: #trainingvideo; side: back; shader: flat;');
+                sphereRef.current?.setAttribute('src', '#trainingvideo');
               } catch {}
             }
           };

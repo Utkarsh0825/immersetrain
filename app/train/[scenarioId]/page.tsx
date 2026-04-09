@@ -13,7 +13,7 @@ import { useQuizEngine } from '@/hooks/useQuizEngine';
 import QuizOverlay from '@/components/train/QuizOverlay';
 import ProgressBar from '@/components/train/ProgressBar';
 import ScoreHUD from '@/components/train/ScoreHUD';
-import type { VideoPlayer360Handle } from '@/components/train/VideoPlayer360';
+import type { VideoPlayer360Handle, VrQuizPayload } from '@/components/train/VideoPlayer360';
 import { enterTrainImmersive, exitTrainImmersive, isAppleMobileWebKit } from '@/lib/trainImmersive';
 
 const VideoPlayer360 = dynamic(() => import('@/components/train/VideoPlayer360'), {
@@ -47,13 +47,8 @@ export default function TrainPage() {
   });
   const [appleMobile, setAppleMobile] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isQuest, setIsQuest] = useState(false);
-  const [quest360Mode, setQuest360Mode] = useState(false);
+  const [inVr, setInVr] = useState(false);
   const vrShownForQuestionId = useRef<string>('');
-  const questVideoStyleRef = useRef<{
-    style: string;
-    controls: boolean;
-  } | null>(null);
 
   const playerRef = useRef<VideoPlayer360Handle>(null);
   const trainShellRef = useRef<HTMLDivElement>(null);
@@ -145,85 +140,6 @@ export default function TrainPage() {
     onComplete: handleComplete,
   });
 
-  const enterQuest360 = useCallback(async () => {
-    const v = playerRef.current?.getVideoElement();
-    if (!v) return;
-    try {
-      // Make the video "paintable" before fullscreen handoff (Quest native compositor).
-      if (!questVideoStyleRef.current) {
-        questVideoStyleRef.current = { style: v.getAttribute('style') ?? '', controls: v.hasAttribute('controls') };
-      }
-      v.setAttribute(
-        'style',
-        [
-          'position:fixed',
-          'inset:0',
-          'width:100vw',
-          'height:100vh',
-          'opacity:1',
-          'z-index:99999',
-          'object-fit:cover',
-          'background:#000',
-        ].join(';')
-      );
-      v.setAttribute('controls', '');
-
-      // Must be invoked in the same user gesture as fullscreen on Quest.
-      // Try to ensure playback is "awake" before native 360 reprojection kicks in.
-      try {
-        v.muted = false;
-      } catch {}
-      await v.play().catch(() => {});
-
-      // Quest shows a native “360°” projection option in its fullscreen player.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const anyV = v as any;
-      if (typeof v.requestFullscreen === 'function') {
-        await v.requestFullscreen();
-      } else if (typeof anyV.webkitEnterFullscreen === 'function') {
-        anyV.webkitEnterFullscreen();
-      }
-      // Some Quest builds need play() again after fullscreen.
-      await v.play().catch(() => {});
-      setQuest360Mode(true);
-    } catch {}
-  }, []);
-
-  const exitQuest360 = useCallback(async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-    } catch {}
-    // Restore video element styles.
-    const v = playerRef.current?.getVideoElement();
-    const prev = questVideoStyleRef.current;
-    if (v && prev) {
-      try {
-        v.setAttribute('style', prev.style || 'width:1px;height:1px;opacity:0.01;position:absolute;left:0;top:0;pointer-events:none');
-        if (!prev.controls) v.removeAttribute('controls');
-      } catch {}
-      questVideoStyleRef.current = null;
-    }
-    setQuest360Mode(false);
-  }, []);
-
-  // If user exits fullscreen via system UI, restore video styles.
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    if (!isQuest) return;
-    const onFsChange = () => {
-      if (document.fullscreenElement) return;
-      if (quest360Mode) void exitQuest360();
-    };
-    document.addEventListener('fullscreenchange', onFsChange);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (document as any).addEventListener?.('webkitfullscreenchange', onFsChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', onFsChange);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (document as any).removeEventListener?.('webkitfullscreenchange', onFsChange);
-    };
-  }, [isQuest, quest360Mode, exitQuest360]);
-
   // Register time-update listener once player is ready
   useEffect(() => {
     if (!playerReady || !playerRef.current) return;
@@ -232,34 +148,64 @@ export default function TrainPage() {
       const shouldPause = quiz.checkTimestamp(time);
       if (shouldPause && !isPausedRef.current) {
         isPausedRef.current = true;
-        if (isQuest && quest360Mode) {
-          // Native Quest fullscreen mode: exit fullscreen so HTML quiz can appear, then pause video.
-          void exitQuest360();
-          playerRef.current?.pause();
-        } else {
-          // Default: freeze the sphere.
-          playerRef.current?.freezeFrame();
-        }
+        // Quest/WebXR: don't pause the video element (it can reset decode to frame 0).
+        // Instead, freeze the videosphere to a canvas frame.
+        playerRef.current?.freezeFrame();
       }
     });
     return () => cleanupTimeUpdate.current?.();
-  }, [playerReady, quiz.quizState, quiz.checkTimestamp, isQuest, quest360Mode, exitQuest360]);
+  }, [playerReady, quiz.quizState, quiz.checkTimestamp]);
 
   // Resume video when quiz returns to 'playing'
   useEffect(() => {
     if (quiz.quizState === 'playing' && isPausedRef.current) {
       isPausedRef.current = false;
-      if (isQuest && quest360Mode) {
-        // Browsers generally require a user gesture to re-enter fullscreen.
-        // Resume playback and let the user tap fullscreen again.
-        setTimeout(() => {
-          playerRef.current?.play();
-        }, 60);
-      } else {
-        setTimeout(() => playerRef.current?.resumeFromFreeze(0.6), 60);
-      }
+      setTimeout(() => playerRef.current?.resumeFromFreeze(0.6), 60);
     }
-  }, [quiz.quizState, isQuest, quest360Mode]);
+  }, [quiz.quizState]);
+
+  // When in WebXR VR mode, show questions inside the A-Frame scene (camera-attached HUD).
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    if (!inVr) {
+      vrShownForQuestionId.current = '';
+      player.hideVrQuiz();
+      return;
+    }
+
+    // Keep the in-scene panel visible during feedback, and hide only when returning to playing/completed.
+    if (!quiz.currentQuestion) {
+      player.hideVrQuiz();
+      return;
+    }
+    if (quiz.quizState === 'playing' || quiz.quizState === 'completed') {
+      player.hideVrQuiz();
+      return;
+    }
+    if (quiz.quizState === 'showing_feedback') {
+      return;
+    }
+    if (quiz.quizState !== 'paused_for_question') return;
+
+    const q = quiz.currentQuestion!;
+    if (vrShownForQuestionId.current === q.id) return;
+    vrShownForQuestionId.current = q.id;
+
+    const payload: VrQuizPayload = {
+      id: q.id,
+      questionIndex: quiz.answeredCount,
+      totalQuestions: quiz.totalQuestions,
+      questionText: q.question_text ?? '',
+      optionA: q.option_a ?? '',
+      optionB: q.option_b ?? '',
+      correctOption: (q.correct_option ?? 'a') as 'a' | 'b',
+      explanation: q.explanation ?? '',
+      points: q.points ?? 10,
+    };
+    player.showVrQuiz(payload);
+  }, [inVr, quiz.quizState, quiz.currentQuestion, quiz.answeredCount, quiz.totalQuestions]);
 
   const maxScore = (scenario?.questions.length ?? 10) * 10;
 
@@ -277,11 +223,6 @@ export default function TrainPage() {
 
   useEffect(() => {
     setAppleMobile(isAppleMobileWebKit());
-  }, []);
-
-  useEffect(() => {
-    if (typeof navigator === 'undefined') return;
-    setIsQuest(/OculusBrowser|Quest/i.test(navigator.userAgent ?? ''));
   }, []);
 
   useEffect(() => {
@@ -371,6 +312,12 @@ export default function TrainPage() {
         videoUrl={scenario?.video_url ?? DEMO_SCENARIO.video_url}
         fullscreenRootRef={trainShellRef}
         fullscreenOnStart
+        onVrModeChange={(v) => setInVr(v)}
+        onVrQuizAnswer={({ questionId, chosenOption }) => {
+          // Guard: only accept answers for the currently shown question.
+          if (quiz.currentQuestion?.id !== questionId) return;
+          quiz.submitAnswer(chosenOption);
+        }}
         onReady={() => {
           setPlayerReady(true);
         }}
@@ -378,17 +325,18 @@ export default function TrainPage() {
 
       {/* ── Quiz overlay ── */}
       <AnimatePresence>
-        {(quiz.quizState === 'paused_for_question' || quiz.quizState === 'showing_feedback') &&
+        {!inVr &&
+          (quiz.quizState === 'paused_for_question' || quiz.quizState === 'showing_feedback') &&
           quiz.currentQuestion && (
-          <QuizOverlay
-            key={quiz.currentQuestion.id}
-            question={quiz.currentQuestion}
-            onAnswer={quiz.submitAnswer}
-            feedback={quiz.lastAnswer}
-            questionIndex={quiz.answeredCount > 0 && quiz.lastAnswer ? quiz.answeredCount - 1 : quiz.answeredCount}
-            totalQuestions={quiz.totalQuestions}
-          />
-        )}
+            <QuizOverlay
+              key={quiz.currentQuestion.id}
+              question={quiz.currentQuestion}
+              onAnswer={quiz.submitAnswer}
+              feedback={quiz.lastAnswer}
+              questionIndex={quiz.answeredCount > 0 && quiz.lastAnswer ? quiz.answeredCount - 1 : quiz.answeredCount}
+              totalQuestions={quiz.totalQuestions}
+            />
+          )}
       </AnimatePresence>
 
       {/* ── Completion screen ── */}
@@ -442,19 +390,11 @@ export default function TrainPage() {
         </div>
       )}
 
-      {/* Fullscreen toggle (desktop: fullscreen shell, Quest: fullscreen video element) */}
+      {/* Fullscreen toggle (shell fullscreen so quiz stays visible) */}
       {playerReady && !completed && (
         <button
           type="button"
           onClick={() => {
-            if (isQuest) {
-              // YouTube-style: fullscreen the <video> itself so Quest can enable native 360 reprojection.
-              if (quest360Mode) void exitQuest360();
-              else void enterQuest360();
-              return;
-            }
-
-            // Desktop / mobile: fullscreen the shell so HTML quiz overlay remains visible.
             if (isFullscreen) exitTrainImmersive();
             else enterTrainImmersive(trainShellRef.current);
           }}
@@ -462,7 +402,7 @@ export default function TrainPage() {
           style={{
             position: 'absolute',
             bottom: 16,
-            right: 16,
+            left: 16,
             zIndex: 12,
             width: 38,
             height: 38,
