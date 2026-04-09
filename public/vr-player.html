@@ -28,10 +28,16 @@
           if (typeof window.IT_onQuizHit === 'function') window.IT_onQuizHit(c);
         },
         onEnter: function () {
-          this.el.setAttribute('material', 'color: #2a2a4e; shader: flat; opacity: 0.98; side: double');
+          this.el.setAttribute(
+            'material',
+            'color: #1e293b; shader: flat; opacity: 0.58; transparent: true; side: double'
+          );
         },
         onLeave: function () {
-          this.el.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98; side: double');
+          this.el.setAttribute(
+            'material',
+            'color: #0d1117; shader: flat; opacity: 0.42; transparent: true; side: double'
+          );
         },
         remove: function () {
           this.el.removeEventListener('click', this.onClick);
@@ -120,50 +126,137 @@
             raycaster="objects: .clickable; far: 20; interval: 50"
             visible="false"
           ></a-entity>
-          <a-entity id="quiz-panel" position="0 -0.25 -1.8" visible="false">
+          <a-entity id="quiz-panel" position="0 -0.22 -1.78" visible="false">
+            <!-- Slightly transparent panel so underlying 360 still reads; text uses outline + bg for any video palette. -->
             <a-plane
               id="quiz-bg"
-              width="1.42"
-              height="0.88"
-              material="color: #0d0d18; shader: flat; opacity: 0.95; side: double"
+              width="1.52"
+              height="1.05"
+              material="color: #050508; shader: flat; opacity: 0.72; transparent: true; side: double"
             ></a-plane>
             <a-plane
-              width="1.42"
-              height="0.04"
-              position="0 0.42 0.001"
-              material="color: #5B4CFF; shader: flat; opacity: 1; side: double"
+              width="1.52"
+              height="0.045"
+              position="0 0.502 0.002"
+              material="color: #5B4CFF; shader: flat; opacity: 0.92; transparent: true; side: double"
             ></a-plane>
-            <a-text id="quiz-label" value="QUESTION 1 OF 10" color="#5B4CFF" align="left" anchor="left" width="1.25" position="-0.69 0.33 0.002"></a-text>
-            <a-text id="quiz-points" value="+ 10 pts" color="#00D4FF" align="right" anchor="right" width="1.0" position="0.69 0.33 0.002"></a-text>
-            <a-text id="quiz-question" value="Loading question..." color="#FFFFFF" align="left" anchor="left" width="1.25" wrap-count="40" position="-0.69 0.15 0.002"></a-text>
-            <!-- Hit target = planes with class clickable (raycaster ignores videosphere). Text sits slightly behind so laser hits the plane. -->
-            <a-entity id="option-a-btn" position="0 -0.12 0.002">
+            <a-text
+              id="quiz-label"
+              value="QUESTION 1 OF 10"
+              color="#B8A8FF"
+              align="left"
+              anchor="left"
+              width="1.35"
+              wrap-count="50"
+              position="-0.74 0.36 0.012"
+            ></a-text>
+            <a-text
+              id="quiz-points"
+              value="+ 10 pts"
+              color="#5EEAD4"
+              align="right"
+              anchor="right"
+              width="1.05"
+              position="0.74 0.36 0.012"
+            ></a-text>
+            <a-text
+              id="quiz-question"
+              value="Loading question..."
+              color="#FAFAFA"
+              align="left"
+              anchor="left"
+              width="1.38"
+              wrap-count="46"
+              line-height="52"
+              outline-color="#000000"
+              outline-width="0.035"
+              position="-0.74 0.14 0.012"
+            ></a-text>
+            <!-- Clickable planes first (laser hits them); label text is in front (+z) without .clickable so ray passes through to plane. -->
+            <a-entity id="option-a-btn" position="0 -0.11 0.003">
               <a-plane
                 id="option-a-bg"
                 class="clickable"
-                width="1.34"
-                height="0.17"
+                width="1.4"
+                height="0.19"
                 position="0 0 0"
-                material="color: #1a1a2e; shader: flat; opacity: 0.98; side: double"
+                material="color: #0d1117; shader: flat; opacity: 0.42; transparent: true; side: double"
                 immersetrain-quiz-hit="choice: a"
               ></a-plane>
-              <a-text id="option-a-label" value="A" color="#5B4CFF" align="left" anchor="left" width="0.3" position="-0.62 0 -0.006"></a-text>
-              <a-text id="option-a-text" value="Option A" color="#FFFFFF" align="left" anchor="left" width="1.1" wrap-count="38" position="-0.52 0 -0.006"></a-text>
+              <a-text
+                id="option-a-label"
+                value="A"
+                color="#C4B5FD"
+                align="left"
+                anchor="left"
+                width="0.35"
+                outline-color="#000000"
+                outline-width="0.04"
+                position="-0.64 0 0.016"
+              ></a-text>
+              <a-text
+                id="option-a-text"
+                value="Option A"
+                color="#FFFFFF"
+                align="left"
+                anchor="left"
+                width="1.15"
+                wrap-count="40"
+                line-height="48"
+                outline-color="#000000"
+                outline-width="0.03"
+                position="-0.54 0 0.016"
+              ></a-text>
             </a-entity>
-            <a-entity id="option-b-btn" position="0 -0.33 0.002">
+            <a-entity id="option-b-btn" position="0 -0.34 0.003">
               <a-plane
                 id="option-b-bg"
                 class="clickable"
-                width="1.34"
-                height="0.17"
+                width="1.4"
+                height="0.19"
                 position="0 0 0"
-                material="color: #1a1a2e; shader: flat; opacity: 0.98; side: double"
+                material="color: #0d1117; shader: flat; opacity: 0.42; transparent: true; side: double"
                 immersetrain-quiz-hit="choice: b"
               ></a-plane>
-              <a-text id="option-b-label" value="B" color="#5B4CFF" align="left" anchor="left" width="0.3" position="-0.62 0 -0.006"></a-text>
-              <a-text id="option-b-text" value="Option B" color="#FFFFFF" align="left" anchor="left" width="1.1" wrap-count="38" position="-0.52 0 -0.006"></a-text>
+              <a-text
+                id="option-b-label"
+                value="B"
+                color="#C4B5FD"
+                align="left"
+                anchor="left"
+                width="0.35"
+                outline-color="#000000"
+                outline-width="0.04"
+                position="-0.64 0 0.016"
+              ></a-text>
+              <a-text
+                id="option-b-text"
+                value="Option B"
+                color="#FFFFFF"
+                align="left"
+                anchor="left"
+                width="1.15"
+                wrap-count="40"
+                line-height="48"
+                outline-color="#000000"
+                outline-width="0.03"
+                position="-0.54 0 0.016"
+              ></a-text>
             </a-entity>
-            <a-text id="quiz-feedback" value="" color="#22c55e" align="center" width="1.25" wrap-count="44" position="0 -0.55 0.002" visible="false"></a-text>
+            <a-text
+              id="quiz-feedback"
+              value=""
+              color="#86EFAC"
+              align="left"
+              anchor="left"
+              width="1.38"
+              wrap-count="34"
+              line-height="46"
+              outline-color="#000000"
+              outline-width="0.028"
+              position="-0.74 -0.54 0.012"
+              visible="false"
+            ></a-text>
           </a-entity>
         </a-camera>
         <a-entity
@@ -250,6 +343,29 @@
     setVrQuizVisible(false);
   }
 
+  /** Word-wrap for a-text multiline (explanations on bright/dark 360 footage). */
+  function softWrap(str, lineLen) {
+    if (!str) return '';
+    var words = String(str).split(/\s+/);
+    var out = [];
+    var line = '';
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (!w) continue;
+      var next = line ? line + ' ' + w : w;
+      if (next.length > lineLen && line) {
+        out.push(line);
+        line = w;
+      } else {
+        line = next;
+      }
+    }
+    if (line) out.push(line);
+    return out.join('\n');
+  }
+
+  var OPT_MAT_IDLE = 'color: #0d1117; shader: flat; opacity: 0.42; transparent: true; side: double';
+
   function showVrQuiz(payload) {
     var els = vrEls;
     if (!els.panel) return;
@@ -267,8 +383,8 @@
     els.aText.setAttribute('value', payload.optionA || '');
     els.bText.setAttribute('value', payload.optionB || '');
 
-    els.aBg.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98; side: double');
-    els.bBg.setAttribute('material', 'color: #1a1a2e; shader: flat; opacity: 0.98; side: double');
+    els.aBg.setAttribute('material', OPT_MAT_IDLE);
+    els.bBg.setAttribute('material', OPT_MAT_IDLE);
     els.feedback.setAttribute('visible', 'false');
     els.feedback.setAttribute('value', '');
     els.cursor.setAttribute('visible', 'true');
@@ -285,15 +401,33 @@
       var correctBg = correct === 'a' ? els.aBg : els.bBg;
       var pts = payload.points != null ? payload.points : 10;
       if (isCorrect) {
-        chosenBg.setAttribute('material', 'color: #166534; shader: flat; opacity: 0.98');
-        els.feedback.setAttribute('value', 'Correct! +' + pts);
-        els.feedback.setAttribute('color', '#22c55e');
+        chosenBg.setAttribute(
+          'material',
+          'color: #14532d; shader: flat; opacity: 0.78; transparent: true; side: double'
+        );
+        els.feedback.setAttribute(
+          'value',
+          'Correct — +' + pts + ' pts\n\nKeep watching for the next cue.'
+        );
+        els.feedback.setAttribute('color', '#BBF7D0');
       } else {
-        chosenBg.setAttribute('material', 'color: #7f1d1d; shader: flat; opacity: 0.98');
-        correctBg.setAttribute('material', 'color: #166534; shader: flat; opacity: 0.98');
-        var msg = (payload.explanation || 'Incorrect').slice(0, 110);
-        els.feedback.setAttribute('value', msg);
-        els.feedback.setAttribute('color', '#ef4444');
+        chosenBg.setAttribute(
+          'material',
+          'color: #7f1d1d; shader: flat; opacity: 0.78; transparent: true; side: double'
+        );
+        correctBg.setAttribute(
+          'material',
+          'color: #14532d; shader: flat; opacity: 0.78; transparent: true; side: double'
+        );
+        var expl = (payload.explanation || 'Review the scenario and try again on the next run.').slice(
+          0,
+          320
+        );
+        els.feedback.setAttribute(
+          'value',
+          'Not quite — here is why:\n\n' + softWrap(expl, 36)
+        );
+        els.feedback.setAttribute('color', '#FECACA');
       }
       els.feedback.setAttribute('visible', 'true');
       els.cursor.setAttribute('visible', 'false');
@@ -304,7 +438,7 @@
         timestamp: freezeT != null ? freezeT : frozenAt,
         videoTime: video ? video.currentTime : null,
       });
-      setTimeout(hideVrQuiz, 2500);
+      setTimeout(hideVrQuiz, isCorrect ? 2600 : 4200);
     }
 
     window.IT_onQuizHit = function (choice) {

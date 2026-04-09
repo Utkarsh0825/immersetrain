@@ -43,18 +43,20 @@ export default function QuizOverlay({
       width: '100%',
       padding: '14px 18px',
       borderRadius: 12,
-      border: '1px solid rgba(255,255,255,0.1)',
-      background: 'rgba(255,255,255,0.04)',
-      color: 'rgba(255,255,255,0.8)',
+      border: '1px solid rgba(255,255,255,0.14)',
+      background: 'rgba(5,8,20,0.42)',
+      backdropFilter: 'blur(12px)',
+      color: 'rgba(255,255,255,0.92)',
       fontSize: 14,
       fontWeight: 500,
-      lineHeight: 1.4,
+      lineHeight: 1.45,
       textAlign: 'left',
       cursor: selected ? 'default' : 'pointer',
       transition: 'all 0.25s ease',
       display: 'flex',
       alignItems: 'flex-start',
       gap: 10,
+      textShadow: '0 1px 3px rgba(0,0,0,0.85)',
     };
 
     if (!feedback || selected !== opt) {
@@ -196,8 +198,9 @@ export default function QuizOverlay({
         {/* Question text */}
         <h3 style={{
           fontFamily: 'var(--font-syne, system-ui)',
-          fontSize: 16, fontWeight: 700, color: 'white',
-          lineHeight: 1.45, marginBottom: 20,
+          fontSize: 16, fontWeight: 700, color: '#FAFAFA',
+          lineHeight: 1.5, marginBottom: 20,
+          textShadow: '0 1px 4px rgba(0,0,0,0.9)',
         }}>
           {question.question_text}
         </h3>
@@ -219,8 +222,8 @@ export default function QuizOverlay({
               onMouseLeave={(e) => {
                 if (!selected && !feedback) {
                   const el = e.currentTarget;
-                  el.style.background = 'rgba(255,255,255,0.04)';
-                  el.style.borderColor = 'rgba(255,255,255,0.1)';
+                  el.style.background = 'rgba(5,8,20,0.42)';
+                  el.style.borderColor = 'rgba(255,255,255,0.14)';
                 }
               }}
             >
@@ -255,15 +258,35 @@ export default function QuizOverlay({
                     : <XCircle size={15} color="#ef4444" />}
                   <span style={{
                     fontSize: 13, fontWeight: 700,
-                    color: feedback.isCorrect ? '#22c55e' : '#ef4444',
+                    color: feedback.isCorrect ? '#86EFAC' : '#FECACA',
                   }}>
-                    {feedback.isCorrect ? `Correct! +${feedback.pointsEarned} points` : 'Incorrect'}
+                    {feedback.isCorrect
+                      ? `Correct — +${feedback.pointsEarned} pts`
+                      : 'Not quite'}
                   </span>
                 </div>
                 {!feedback.isCorrect && (
-                  <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
-                    {feedback.explanation}
-                  </p>
+                  <>
+                    <p style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.45)',
+                      margin: '0 0 6px',
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}>
+                      Why
+                    </p>
+                    <p style={{
+                      fontSize: 13,
+                      color: 'rgba(255,255,255,0.78)',
+                      lineHeight: 1.55,
+                      margin: 0,
+                      textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                    }}>
+                      {feedback.explanation}
+                    </p>
+                  </>
                 )}
               </div>
 
