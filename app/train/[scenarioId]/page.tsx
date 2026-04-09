@@ -51,6 +51,10 @@ export default function TrainPage() {
   const [isQuest, setIsQuest] = useState(false);
   const [quest360Mode, setQuest360Mode] = useState(false);
   const vrShownForQuestionId = useRef<string>('');
+  const questVideoStyleRef = useRef<{
+    style: string;
+    controls: boolean;
+  } | null>(null);
 
   const playerRef = useRef<VideoPlayer360Handle>(null);
   const trainShellRef = useRef<HTMLDivElement>(null);
@@ -146,6 +150,25 @@ export default function TrainPage() {
     const v = playerRef.current?.getVideoElement();
     if (!v) return;
     try {
+      // Make the video "paintable" before fullscreen handoff (Quest native compositor).
+      if (!questVideoStyleRef.current) {
+        questVideoStyleRef.current = { style: v.getAttribute('style') ?? '', controls: v.hasAttribute('controls') };
+      }
+      v.setAttribute(
+        'style',
+        [
+          'position:fixed',
+          'inset:0',
+          'width:100vw',
+          'height:100vh',
+          'opacity:1',
+          'z-index:99999',
+          'object-fit:cover',
+          'background:#000',
+        ].join(';')
+      );
+      v.setAttribute('controls', '');
+
       // Must be invoked in the same user gesture as fullscreen on Quest.
       // Try to ensure playback is "awake" before native 360 reprojection kicks in.
       try {
@@ -171,8 +194,36 @@ export default function TrainPage() {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
     } catch {}
+    // Restore video element styles.
+    const v = playerRef.current?.getVideoElement();
+    const prev = questVideoStyleRef.current;
+    if (v && prev) {
+      try {
+        v.setAttribute('style', prev.style || 'width:1px;height:1px;opacity:0.01;position:absolute;left:0;top:0;pointer-events:none');
+        if (!prev.controls) v.removeAttribute('controls');
+      } catch {}
+      questVideoStyleRef.current = null;
+    }
     setQuest360Mode(false);
   }, []);
+
+  // If user exits fullscreen via system UI, restore video styles.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!isQuest) return;
+    const onFsChange = () => {
+      if (document.fullscreenElement) return;
+      if (quest360Mode) void exitQuest360();
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (document as any).addEventListener?.('webkitfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (document as any).removeEventListener?.('webkitfullscreenchange', onFsChange);
+    };
+  }, [isQuest, quest360Mode, exitQuest360]);
 
   // Register time-update listener once player is ready
   useEffect(() => {
