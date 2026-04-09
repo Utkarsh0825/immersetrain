@@ -146,6 +146,13 @@ export default function TrainPage() {
     const v = playerRef.current?.getVideoElement();
     if (!v) return;
     try {
+      // Must be invoked in the same user gesture as fullscreen on Quest.
+      // Try to ensure playback is "awake" before native 360 reprojection kicks in.
+      try {
+        v.muted = false;
+      } catch {}
+      await v.play().catch(() => {});
+
       // Quest shows a native “360°” projection option in its fullscreen player.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const anyV = v as any;
@@ -154,6 +161,8 @@ export default function TrainPage() {
       } else if (typeof anyV.webkitEnterFullscreen === 'function') {
         anyV.webkitEnterFullscreen();
       }
+      // Some Quest builds need play() again after fullscreen.
+      await v.play().catch(() => {});
       setQuest360Mode(true);
     } catch {}
   }, []);

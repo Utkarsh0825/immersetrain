@@ -649,6 +649,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
             vr-mode-ui="enabled: ${stereoUi}"
             device-orientation-permission-ui="enabled: true"
           >
+            <!-- Quest native mode: keep the scene for 2D preview, but the immersive path uses fullscreen <video>. -->
             <video
               id="trainingvideo"
               muted
@@ -656,6 +657,7 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               webkit-playsinline
               crossorigin="anonymous"
               preload="auto"
+              ${isQuest ? 'controls' : ''}
               style="width:1px;height:1px;opacity:0.01;position:absolute;left:0;top:0;pointer-events:none"
             ></video>
             <a-assets>
