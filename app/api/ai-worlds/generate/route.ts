@@ -3,13 +3,17 @@ import { InferenceClient } from '@huggingface/inference';
 import { createServiceClient } from '@/lib/supabase';
 import { isSupabaseConfigured } from '@/lib/supabaseConfigured';
 
-export const maxDuration = 120;
+export const maxDuration = 180;
 export const runtime = 'nodejs';
 
-const DEFAULT_MODELS = [
+const PRIMARY_MODEL = 'ProGamerGov/qwen-360-diffusion';
+const FALLBACK_MODELS = [
+  'ProGamerGov/sdxl-360-diffusion',
   'black-forest-labs/FLUX.1-schnell',
-  'stabilityai/stable-diffusion-xl-base-1.0',
 ];
+
+const NEGATIVE_PROMPT =
+  'blurry, low quality, distorted, watermark, text, borders, frame, seam visible, bad panorama, flat, 2D';
 
 function errorMessage(err: unknown): string {
   if (err instanceof Error) {
@@ -35,19 +39,28 @@ function hfToken(): string | null {
   return t || null;
 }
 
-function enhancePrompt(prompt: string, hasReference: boolean): string {
-  const base = prompt.trim();
-  const suffix =
-    'equirectangular 360 view, 360 panorama, seamless panoramic projection, photorealistic, high detail, wide angle immersion';
+function enhancePrompt(userPrompt: string, hasReference: boolean): string {
+  const parts = [
+    'equirectangular 360 degree panorama',
+    '360 image, seamless panoramic photograph',
+    userPrompt.trim(),
+    'photorealistic, high quality, detailed',
+    'professional photography, sharp focus',
+    'indoor lighting, realistic textures',
+    '2:1 aspect ratio, no borders, seamless edges',
+    'left edge connects to right edge',
+  ];
   if (hasReference) {
-    return `${base}, match the architecture lighting materials and signage of the reference photo, ${suffix}`;
+    parts.splice(3, 0, 'match the architecture lighting materials and signage of the reference photo');
   }
-  return `${base}, ${suffix}`;
+  return parts.join(', ');
 }
 
 function modelList(): string[] {
   const preferred = process.env.HUGGING_FACE_IMAGE_MODEL?.trim();
-  const list = preferred ? [preferred, ...DEFAULT_MODELS] : [...DEFAULT_MODELS];
+  const list = preferred
+    ? [preferred, PRIMARY_MODEL, ...FALLBACK_MODELS]
+    : [PRIMARY_MODEL, ...FALLBACK_MODELS];
   return [...new Set(list)];
 }
 
@@ -83,18 +96,89 @@ function isWarmupError(msg: string): boolean {
 
 async function generateTextToImage(
   client: InferenceClient,
+  token: string,
   model: string,
   prompt: string
 ): Promise<{ bytes: Uint8Array; contentType: string }> {
-  const result = await client.textToImage({
-    model,
-    inputs: prompt,
-    parameters: {
-      width: 1024,
-      height: 512,
-    },
-  });
-  return normalizeImageResult(result);
+  // Direct Inference API (best for ProGamerGov 360 checkpoints).
+  const endpoints = [
+    `https://api-inference.huggingface.co/models/${model}`,
+    `https://router.huggingface.co/hf-inference/models/${model}`,
+  ];
+
+  let lastErr = 'No endpoint responded';
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'image/png, image/jpeg, application/json',
+        },
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            width: 2048,
+            height: 1024,
+            num_inference_steps: 40,
+            guidance_scale: 7.0,
+            negative_prompt: NEGATIVE_PROMPT,
+          },
+        }),
+      });
+
+      if (res.status === 503) {
+        const j = (await res.json().catch(() => ({}))) as { estimated_time?: number; error?: string };
+        const err = new Error(j.error || 'Model is loading');
+        (err as Error & { warmup?: boolean; estimated?: number }).warmup = true;
+        (err as Error & { estimated?: number }).estimated = j.estimated_time ?? 60;
+        throw err;
+      }
+
+      if (!res.ok) {
+        lastErr = await res.text().catch(() => res.statusText);
+        continue;
+      }
+
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        lastErr = await res.text();
+        continue;
+      }
+
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.byteLength < 500) {
+        lastErr = 'Empty image response';
+        continue;
+      }
+      return {
+        bytes,
+        contentType: ct.includes('png') ? 'image/png' : 'image/jpeg',
+      };
+    } catch (err) {
+      if ((err as { warmup?: boolean })?.warmup) throw err;
+      lastErr = errorMessage(err);
+    }
+  }
+
+  // SDK fallback (providers) for models that aren't on classic Inference API.
+  try {
+    const result = await client.textToImage({
+      model,
+      inputs: prompt,
+      parameters: {
+        width: 2048,
+        height: 1024,
+        num_inference_steps: 40,
+        guidance_scale: 7.0,
+        negative_prompt: NEGATIVE_PROMPT,
+      },
+    });
+    return normalizeImageResult(result);
+  } catch (err) {
+    throw new Error(`${errorMessage(err)} | direct: ${lastErr.slice(0, 200)}`);
+  }
 }
 
 async function generateWithReference(
@@ -113,6 +197,7 @@ async function generateWithReference(
     parameters: {
       prompt,
       strength: 0.7,
+      negative_prompt: NEGATIVE_PROMPT,
     },
   });
   return normalizeImageResult(result);
@@ -187,11 +272,11 @@ export async function POST(req: NextRequest) {
         } catch (err) {
           const msg = errorMessage(err);
           errors.push(`img2img/${model}: ${msg}`);
-          if (isWarmupError(msg)) {
+          if (isWarmupError(msg) || (err as { warmup?: boolean })?.warmup) {
             return NextResponse.json(
               {
                 error: 'Model is warming up. Please wait and try again.',
-                estimated_time: 35,
+                estimated_time: (err as { estimated?: number })?.estimated ?? 60,
                 retry: true,
                 model,
               },
@@ -203,18 +288,18 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const out = await generateTextToImage(client, model, enhanced);
+        const out = await generateTextToImage(client, token, model, enhanced);
         bytes = out.bytes;
         contentType = out.contentType;
         break;
       } catch (err) {
         const msg = errorMessage(err);
         errors.push(`txt2img/${model}: ${msg}`);
-        if (isWarmupError(msg)) {
+        if (isWarmupError(msg) || (err as { warmup?: boolean })?.warmup) {
           return NextResponse.json(
             {
-              error: 'Model is warming up. Please wait and try again.',
-              estimated_time: 35,
+              error: 'Model is warming up. This can take 1–2 minutes on first run.',
+              estimated_time: (err as { estimated?: number })?.estimated ?? 60,
               retry: true,
               model,
             },

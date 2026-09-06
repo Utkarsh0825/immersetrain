@@ -52,10 +52,11 @@ const PRESETS: { label: string; prompt: string }[] = [
 ];
 
 const LOADING_LINES = [
-  'Initializing AI model…',
-  'Generating your 360° environment…',
-  'Applying panoramic projection…',
-  'Finalizing the world…',
+  'Generating your 360° world… (this takes 1–2 minutes)',
+  'Warming up the panorama model…',
+  'Building seamless equirectangular edges…',
+  'Applying photorealistic detail…',
+  'Almost ready — still rendering…',
 ];
 
 function uid() {
@@ -142,7 +143,7 @@ export default function AiWorldsPage() {
 
   useEffect(() => {
     if (!isGenerating) return;
-    const id = window.setInterval(() => setLoadingLine((i) => (i + 1) % LOADING_LINES.length), 2800);
+    const id = window.setInterval(() => setLoadingLine((i) => (i + 1) % LOADING_LINES.length), 4500);
     return () => window.clearInterval(id);
   }, [isGenerating]);
 
