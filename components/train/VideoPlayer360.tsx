@@ -2,6 +2,7 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState, useCallback } from 'react';
 import { Play } from 'lucide-react';
 import { enterTrainImmersive } from '@/lib/trainImmersive';
+import { isEquirectImageUrl } from '@/lib/mediaKind';
 
 export interface VideoPlayer360Handle {
   play: () => void;
@@ -326,6 +327,12 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     }, []);
 
     const freezeFrame = useCallback(() => {
+      const sky = containerRef.current?.querySelector('#immersive-sky') as HTMLElement | null;
+      if (sky) {
+        inFreezeRef.current = true;
+        frozenAtRef.current = lastKnownTimeRef.current;
+        return;
+      }
       const v = videoRef.current;
       const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
       const canvas =
@@ -370,6 +377,12 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
     }, []);
 
     const resumeFromFreeze = useCallback((skipSeconds: number = 0.6) => {
+      const sky = containerRef.current?.querySelector('#immersive-sky') as HTMLElement | null;
+      if (sky) {
+        inFreezeRef.current = false;
+        lastKnownTimeRef.current = Math.max(0, (frozenAtRef.current || lastKnownTimeRef.current) + skipSeconds);
+        return;
+      }
       const v = videoRef.current;
       const sphere = sphereRef.current ?? (containerRef.current?.querySelector('#immersive-sphere') as HTMLElement | null);
       if (!v || !sphere) return;
@@ -465,6 +478,25 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         const scene = container?.querySelector('a-scene') as ASceneEl | null;
         sceneElRef.current = scene;
         await waitSceneReady(scene);
+
+        const sky = container?.querySelector('#immersive-sky') as HTMLElement | null;
+        if (sky) {
+          // Static AI world: advance a synthetic timeline so quiz timestamps still fire.
+          setVideoBuffering(false);
+          if (timeGuardRef.current != null) {
+            window.clearInterval(timeGuardRef.current);
+            timeGuardRef.current = null;
+          }
+          let t = 0;
+          lastKnownTimeRef.current = 0;
+          timeGuardRef.current = window.setInterval(() => {
+            if (inFreezeRef.current) return;
+            t += 0.25;
+            lastKnownTimeRef.current = t;
+            timeCallbacks.current.forEach((cb) => cb(t));
+          }, 250);
+          return;
+        }
 
         const videoEl = await waitForVideoInContainer(container, () => !aliveRef.current);
         if (!videoEl) {
@@ -629,20 +661,21 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
         const origin = window.location.origin;
         const resolvedSrc = videoUrl.startsWith('/') ? `${origin}${videoUrl}` : videoUrl;
         resolvedSrcRef.current = resolvedSrc;
+        const imageMode = isEquirectImageUrl(resolvedSrc);
 
         /* src set in JS so query strings / encoding never break the inline scene HTML */
         questRef.current = /OculusBrowser|Quest/i.test(window.navigator.userAgent ?? '');
         // VR button can be enabled again: quizzes render inside the scene for WebXR.
         const stereoUi = 'true';
-        container.innerHTML = `
-          <a-scene
-            embedded
-            style="height:100%;width:100%;position:absolute;top:0;left:0"
-            renderer="colorManagement: true"
-            loading-screen="enabled: false"
-            vr-mode-ui="enabled: ${stereoUi}"
-            device-orientation-permission-ui="enabled: true"
-          >
+        const mediaBlock = imageMode
+          ? `
+            <a-sky id="immersive-sky" src="" rotation="0 -90 0"></a-sky>
+            <a-assets>
+              <canvas id="freezeCanvas" width="1280" height="640"></canvas>
+            </a-assets>
+            <a-entity id="immersive-sphere" visible="false"></a-entity>
+          `
+          : `
             <video
               id="trainingvideo"
               muted
@@ -661,6 +694,17 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
               rotation="0 -90 0"
               visible="true"
             ></a-videosphere>
+          `;
+        container.innerHTML = `
+          <a-scene
+            embedded
+            style="height:100%;width:100%;position:absolute;top:0;left:0"
+            renderer="colorManagement: true"
+            loading-screen="enabled: false"
+            vr-mode-ui="enabled: ${stereoUi}"
+            device-orientation-permission-ui="enabled: true"
+          >
+            ${mediaBlock}
             <a-entity id="camera-rig" position="0 1.6 0">
               <a-camera id="main-camera" look-controls="pointerLockEnabled: false" wasd-controls="enabled: false">
                 <a-entity id="vr-start-screen" visible="false">
@@ -768,6 +812,12 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
           videoEl.src = resolvedSrc;
           videoEl.load();
         }
+        const skyEl = container.querySelector('#immersive-sky') as HTMLElement | null;
+        if (skyEl) {
+          try {
+            skyEl.setAttribute('src', resolvedSrc);
+          } catch {}
+        }
 
         const scene = container.querySelector('a-scene') as ASceneEl | null;
         sceneElRef.current = scene;
@@ -779,6 +829,11 @@ const VideoPlayer360 = forwardRef<VideoPlayer360Handle, VideoPlayer360Props>(
 
         const finishReady = () => {
           if (cancelled || !containerRef.current) return;
+          if (imageMode) {
+            // Static AI worlds: no HTMLVideoElement — synthetic clock starts on play.
+            onReadyRef.current?.();
+            return;
+          }
           const v = containerRef.current.querySelector('#trainingvideo') as HTMLVideoElement | null;
           if (v) {
             attachVideoListeners(v, resolvedSrc);

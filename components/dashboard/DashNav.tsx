@@ -8,6 +8,7 @@ import ThemeToggleButton from '@/components/ThemeToggleButton';
 const LINKS = [
   { label: 'Overview', href: '/dashboard' },
   { label: 'Create', href: '/dashboard/create' },
+  { label: 'AI Worlds', href: '/ai-worlds' },
   { label: 'Results', href: '/dashboard/scenarios' },
 ];
 

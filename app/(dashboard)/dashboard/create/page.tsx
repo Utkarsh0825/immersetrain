@@ -198,12 +198,62 @@ export default function ScenarioBuilderPage() {
     void run();
   }, [createdBy]);
 
-  // Read scenarioId from URL (client-only to avoid build-time suspense requirement).
+  // Read scenarioId / AI world handoff from URL (client-only).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const sp = new URLSearchParams(window.location.search);
     const id = sp.get('scenarioId');
     if (id) setScenarioId(id);
+
+    let aiUrl = sp.get('aiWorldUrl');
+    if (!aiUrl && (sp.get('aiWorld') === '1' || sp.has('aiWorld'))) {
+      try {
+        const raw = sessionStorage.getItem('immersetrain_ai_world_handoff');
+        if (raw) {
+          const parsed = JSON.parse(raw) as {
+            imageUrl?: string;
+            title?: string;
+            industry?: string;
+            tag?: string;
+          };
+          if (parsed.imageUrl) aiUrl = parsed.imageUrl;
+          if (parsed.title) setTitle(parsed.title);
+          if (parsed.industry) setIndustry(parsed.industry);
+          if (parsed.tag) setTags((prev) => (prev.includes(parsed.tag!) ? prev : [...prev, parsed.tag!]));
+          sessionStorage.removeItem('immersetrain_ai_world_handoff');
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (aiUrl) {
+      try {
+        const decoded = decodeURIComponent(aiUrl);
+        setVideoUrl(decoded);
+        setVideoTab('url');
+        setUrlDraft(decoded.startsWith('data:') ? 'AI-generated 360° image' : decoded);
+      } catch {
+        setVideoUrl(aiUrl);
+      }
+    }
+    const t = sp.get('title');
+    if (t) {
+      try {
+        setTitle(decodeURIComponent(t));
+      } catch {
+        setTitle(t);
+      }
+    }
+    const ind = sp.get('industry');
+    if (ind) {
+      try {
+        setIndustry(decodeURIComponent(ind));
+      } catch {
+        setIndustry(ind);
+      }
+    }
+    const tag = sp.get('tag');
+    if (tag) setTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
   }, []);
 
   // Load existing scenario when editing

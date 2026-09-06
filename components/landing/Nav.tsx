@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { useTheme } from '@/components/ThemeProvider';
 import { useThemeStyles } from '@/hooks/useThemeStyles';
 
-const NAV_LINKS = [
+const NAV_LINKS: { label: string; href: string; highlight?: boolean }[] = [
   { label: 'How It Works', href: '#how-it-works' },
   { label: 'Features', href: '#features' },
   { label: 'Pricing', href: '#pricing' },
+  { label: 'AI Worlds', href: '/ai-worlds', highlight: true },
   { label: 'Demo', href: '/demo' },
   { label: 'Onboarding', href: '/onboarding' },
 ];
@@ -102,12 +103,23 @@ export default function Nav() {
             {NAV_LINKS.map((link) => {
               const isExternal = link.href.startsWith('/');
               const El = isExternal ? Link : 'a';
+              const highlight = Boolean(link.highlight);
               return (
                 <El
                   key={link.label}
                   href={link.href}
-                  className="nav-link group relative py-1 text-sm font-medium text-[var(--text-secondary)] transition-colors duration-200 hover:text-[var(--text-primary)]"
+                  className="nav-link group relative py-1 text-sm font-medium transition-colors duration-200"
+                  style={
+                    highlight
+                      ? {
+                          color: 'var(--indigo)',
+                          textShadow: t.isDark ? '0 0 18px rgba(91,76,255,0.45)' : 'none',
+                          fontWeight: 700,
+                        }
+                      : { color: 'var(--text-secondary)' }
+                  }
                 >
+                  {highlight ? '✨ ' : ''}
                   {link.label}
                   <span className="absolute bottom-0 left-0 h-px w-full origin-left scale-x-0 bg-[var(--indigo)] transition-transform duration-300 group-hover:scale-x-100" />
                 </El>

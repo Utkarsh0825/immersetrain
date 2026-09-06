@@ -12,6 +12,7 @@ import {
 import { Play } from 'lucide-react';
 import { enterTrainImmersive } from '@/lib/trainImmersive';
 import type { VideoPlayer360Handle, VrQuizPayload } from '@/components/train/VideoPlayer360';
+import { isEquirectImageUrl } from '@/lib/mediaKind';
 
 const CHANNEL = 'IT_VR';
 
@@ -68,7 +69,11 @@ const TrainVrIframePlayer = forwardRef<VideoPlayer360Handle, TrainVrIframePlayer
         switch (d.type) {
           case 'READY_FOR_INIT': {
             const w = iframeRef.current?.contentWindow;
-            postToIframe(w, { type: 'INIT', videoUrl: resolvedUrl });
+            postToIframe(w, {
+              type: 'INIT',
+              videoUrl: resolvedUrl,
+              mediaKind: isEquirectImageUrl(resolvedUrl) ? 'image' : 'video',
+            });
             break;
           }
           case 'PLAYER_READY':

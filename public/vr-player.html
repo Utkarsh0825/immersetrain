@@ -77,6 +77,7 @@
         rotation="0 -90 0"
         visible="true"
       ></a-videosphere>
+      <a-sky id="immersive-sky" src="" visible="false" rotation="0 -90 0"></a-sky>
       <!-- Hands as rig children: laser raycaster only intersects .clickable (quiz planes), not the videosphere. -->
       <a-entity id="camera-rig" position="0 1.6 0">
         <a-camera id="main-camera" look-controls="pointerLockEnabled: false" wasd-controls="enabled: false">
@@ -306,6 +307,9 @@
   var inFreeze = false;
   var timeThrottle = 0;
   var videoListenersAttached = false;
+  var mediaKind = 'video';
+  var imageClock = null;
+  var imageTime = 0;
   var vrEls = {};
   var startHandlers = { click: null, trigger: null, select: null };
 
@@ -450,6 +454,12 @@
   }
 
   function freezeFrame() {
+    if (mediaKind === 'image') {
+      frozenAt = imageTime || lastKnownTime;
+      inFreeze = true;
+      post('FREEZE_AT', { time: frozenAt });
+      return;
+    }
     if (!video || !sphere || !freezeCanvas) return;
     var t = video.currentTime || lastKnownTime;
     frozenAt = t;
@@ -476,6 +486,13 @@
   function resumeFromFreeze(skipSeconds) {
     /* Small skip clears the same timestamp band so the quiz engine does not immediately re-trigger. */
     skipSeconds = skipSeconds == null ? 0.35 : skipSeconds;
+    if (mediaKind === 'image') {
+      inFreeze = false;
+      imageTime = Math.max(0, (frozenAt || imageTime) + skipSeconds);
+      lastKnownTime = imageTime;
+      post('RESUME_AT', { from: frozenAt, to: imageTime, skip: skipSeconds });
+      return;
+    }
     if (!video || !sphere) return;
     var base = frozenAt || video.currentTime || lastKnownTime;
     var target = Math.max(0, base + skipSeconds);
@@ -594,6 +611,46 @@
     });
   }
 
+  function stopImageClock() {
+    if (imageClock) {
+      clearInterval(imageClock);
+      imageClock = null;
+    }
+  }
+
+  function startImageClock() {
+    stopImageClock();
+    imageTime = 0;
+    imageClock = setInterval(function () {
+      if (inFreeze) return;
+      imageTime += 0.25;
+      lastKnownTime = imageTime;
+      post('TIME_UPDATE', { time: imageTime });
+    }, 250);
+  }
+
+  function setMediaMode(kind, url) {
+    mediaKind = kind === 'image' ? 'image' : 'video';
+    var sky = q('#immersive-sky');
+    if (mediaKind === 'image') {
+      try {
+        if (sphere) sphere.setAttribute('visible', 'false');
+        if (sky) {
+          sky.setAttribute('visible', 'true');
+          sky.setAttribute('src', url || '');
+        }
+      } catch (e) {}
+    } else {
+      try {
+        if (sky) sky.setAttribute('visible', 'false');
+        if (sphere) {
+          sphere.setAttribute('visible', 'true');
+          sphere.setAttribute('src', '#trainingvideo');
+        }
+      } catch (e) {}
+    }
+  }
+
   function attachVideo() {
     if (videoListenersAttached) return;
     videoListenersAttached = true;
@@ -620,9 +677,26 @@
     if (!d || d.channel !== CHANNEL) return;
 
     switch (d.type) {
-      case 'INIT':
+      case 'INIT': {
+        if (!video && mediaKind !== 'image') {
+          // video element always exists in markup
+        }
+        var url = d.videoUrl || '';
+        var kind =
+          d.mediaKind === 'image' ||
+          /\.(jpg|jpeg|png|webp|avif)(\?|#|$)/i.test(url) ||
+          String(url).indexOf('/ai-worlds/') !== -1 ||
+          String(url).indexOf('data:image/') === 0
+            ? 'image'
+            : 'video';
+        setMediaMode(kind, url);
+        if (kind === 'image') {
+          cacheVrEls();
+          post('PLAYER_READY', {});
+          break;
+        }
         if (!video) return;
-        video.src = d.videoUrl || '';
+        video.src = url;
         try {
           sphere.setAttribute('src', '#trainingvideo');
         } catch (e) {}
@@ -631,7 +705,12 @@
         cacheVrEls();
         post('PLAYER_READY', {});
         break;
+      }
       case 'START_PLAYBACK':
+        if (mediaKind === 'image') {
+          startImageClock();
+          break;
+        }
         startPlaybackSequence();
         break;
       case 'PLAY': {
