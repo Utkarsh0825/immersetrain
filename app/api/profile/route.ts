@@ -16,7 +16,6 @@ export async function GET(req: NextRequest) {
   }
 
   if (!isSupabaseConfigured()) {
-    // Demo-mode: treat demo-user as onboarded with a fake org.
     if (userId === 'demo-user-001') {
       return NextResponse.json({
         exists: true,
@@ -61,7 +60,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ exists: true, profile, org });
   } catch (err) {
     console.error('[profile GET]', err);
-    return NextResponse.json({ error: 'Failed to load profile', details: errorMessage(err) }, { status: 500 });
+    if (userId === 'demo-user-001') {
+      return NextResponse.json({
+        exists: true,
+        profile: {
+          id: 'local-profile-demo',
+          user_id: userId,
+          full_name: 'Demo User',
+          email: 'demo@immersetrain.com',
+          org_id: 'local-org-demo',
+          role: 'owner',
+          onboarded: true,
+        },
+        org: {
+          id: 'local-org-demo',
+          name: 'Demo Organization',
+          industry: 'Transit & Rail',
+          size_range: '11–50',
+          plan: 'starter',
+        },
+        degraded: true,
+        details: errorMessage(err),
+      });
+    }
+    return NextResponse.json({ exists: false, error: errorMessage(err) }, { status: 200 });
   }
 }
-

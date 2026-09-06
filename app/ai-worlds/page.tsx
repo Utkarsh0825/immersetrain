@@ -62,12 +62,35 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-async function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
+async function fileToCompressedDataUrl(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(new Error('Failed to read image'));
     reader.readAsDataURL(file);
+  });
+
+  // Downscale so serverless body stays small (avoids "fetch failed" on huge payloads).
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1280;
+      const scale = Math.min(1, maxW / Math.max(img.width, 1));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
   });
 }
 
@@ -178,7 +201,7 @@ export default function AiWorldsPage() {
         }
 
         if (!res.ok) {
-          throw new Error(data?.error || 'Generation failed');
+          throw new Error(data?.error || `Generation failed (${res.status})`);
         }
 
         setImageUrl(data.imageUrl);
@@ -195,8 +218,12 @@ export default function AiWorldsPage() {
         ]);
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Generation failed';
-        setError(msg);
-        setMessages((prev) => [...prev, { id: uid(), role: 'assistant', text: `Couldn’t generate: ${msg}` }]);
+        const friendly =
+          msg === 'Failed to fetch' || msg === 'fetch failed'
+            ? 'Network error talking to the API. If this keeps happening, the Hugging Face key may be missing on Vercel — check HUGGING_FACE_API_KEY and Redeploy.'
+            : msg;
+        setError(friendly);
+        setMessages((prev) => [...prev, { id: uid(), role: 'assistant', text: `Couldn’t generate: ${friendly}` }]);
       } finally {
         setIsGenerating(false);
       }
@@ -227,7 +254,7 @@ export default function AiWorldsPage() {
       return;
     }
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const dataUrl = await fileToCompressedDataUrl(file);
       setAttachPreview(dataUrl);
       setError(null);
     } catch {
